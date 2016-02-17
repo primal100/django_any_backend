@@ -83,6 +83,7 @@ DATABASES = {
     'any_backend': {
         'ENGINE': 'any_backend.backends',
         'NAME': 'any_backend',
+        'COMPILER': 'any_backend.compiler'
     }
 }
 

@@ -14,3 +14,6 @@ class DatabaseOperations(BaseDatabaseOperations):
         if self._cache is None:
             raise ImportError('Compiler classes were not imported. Make sure a valid compiler module string is set in your DatabaseWrapper')
         return getattr(self._cache, compiler_name)
+
+    def no_limit_value(self):
+        return None
