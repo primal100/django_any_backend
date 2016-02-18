@@ -1,4 +1,5 @@
 from django.db.models.sql import compiler
+from django.core.exceptions import FieldError
 
 class Client(object):
     """
@@ -12,23 +13,22 @@ class DictToObject:
     def __init__(self, **entries):
         self.__dict__.update(entries)
 
-def make_query_dict(connection, query, immediate_execute):
+def make_dicts(connection, query, immediate_execute, using):
     result = {
         'enter_func': connection.start,
         'exit_func': connection.close,
-        'model': query.model
-        'immediate_execute': False
+        'model': query.model,
+        'immediate_execute': False,
+        'db_config': query.using
     }
-    return result
+    params = {}
+    return result, params
 
 class SQLCompiler(compiler.SQLCompiler):
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
-        result = make_query_dict(self.connection, self.query, False)
-        params = []
-        result['return_many_func'] = self.connection.list
-        result['return_one_func'] = self.connection.get
-        result['count_func'] = self.connection.count
+        result, params = make_dicts(self.connection, self.query, None)
+        result['func'] = self.connection.list
         self.subquery = subquery
         refcounts_before = self.query.alias_refcount.copy()
         try:
@@ -41,25 +41,25 @@ class SQLCompiler(compiler.SQLCompiler):
             result['app'], result['model_name'] = from_.split('.')
             result['app_model'] = from_
 
-            params.extend(f_params)
+            """params.extend(f_params)
 
             where, w_params = self.compile(self.where) if self.where is not None else ("", [])
             having, h_params = self.compile(self.having) if self.having is not None else ("", [])
             if where:
                 params.extend(w_params)
             result['having'] = having
-            params.extend(h_params)
+            params.extend(h_params)"""
 
             out_cols = []
             for _, (s_column, s_params), alias in self.select + extra_select:
-                params.extend(s_params)
+                #params.extend(s_params)
                 out_cols.append(s_column)
             result['out_cols'] = out_cols
 
             grouping = []
             for g_sql, g_params in group_by:
                 grouping.append(g_sql)
-                params.extend(g_params)
+                #params.extend(g_params)
             if grouping:
                 if distinct_fields:
                     raise NotImplementedError(
@@ -92,14 +92,12 @@ class SQLCompiler(compiler.SQLCompiler):
             # Finally do cleanup - get rid of the joins we created above.
             self.query.reset_refcounts(refcounts_before)
 
-    pass
 
 class SQLInsertCompiler(compiler.SQLInsertCompiler):
 
     def as_sql(self):
-        result = make_query_dict(self.connection, self.query, True)
-        result['return_many_func'] = self.connection.create_bulk
-        result['return_one_func'] = self.connection.create_bulk
+        result, params = make_dicts(self.connection, self.query, None)
+        result['func'] = self.connection.create_bulk
         opts = self.query.get_meta()
         fields = self.query.fields if result['has_fields'] else [opts.pk]
         objs=[]
@@ -108,15 +106,51 @@ class SQLInsertCompiler(compiler.SQLInsertCompiler):
             for field in fields:
                 fields_values[field.column] = self.pre_save_val(field, obj)
             objs.append(fields_values)
-        params = objs
+        result['results'] = objs
         return result, params
 
 class SQLDeleteCompiler(compiler.SQLDeleteCompiler):
 
     def as_sql(self):
-        result = make_query_dict(self.connection, self.query, True)
-        result['return_many_func'] = self.connection.delete_bulk
-        result['return_one_func'] = self.connection.delete_bulk
+        result, params = make_dicts(self.connection, self.query, True)
+        result['func'] = self.connection.delete_bulk
+        return result, params
 
 class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
-    pass
+
+    def as_sql(self):
+        result, params = make_dicts(self.connection, self.query, True)
+        result['func'] = self.connection.update_bulk
+        field_values = {}
+        for field, model, val in self.query.values:
+            if hasattr(val, 'resolve_expression'):
+                val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
+                if val.contains_aggregate:
+                    raise FieldError("Aggregate functions are not allowed in this query")
+            elif hasattr(val, 'prepare_database_save'):
+                if field.remote_field:
+                    val = field.get_db_prep_save(
+                        val.prepare_database_save(field),
+                        connection=self.connection,
+                    )
+                else:
+                    raise TypeError(
+                        "Tried to update field %s with a model instance, %r. "
+                        "Use a value compatible with %s."
+                        % (field, val, field.__class__.__name__)
+                    )
+            else:
+                val = field.get_db_prep_save(val, connection=self.connection)
+
+            name = field.column
+            field_values[name] = val
+        if not field_values:
+            return '', ()
+        result['field_values'] = field_values
+        return result, params
+
+class SQLAggregateCompiler(compiler.SQLAggregateCompiler):
+    def as_sql(self):
+        result, params = make_dicts(self.connection, self.query, True)
+        result['func'] = self.connection.count
+        pass
