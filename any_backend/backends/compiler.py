@@ -12,21 +12,23 @@ class DictToObject:
     def __init__(self, **entries):
         self.__dict__.update(entries)
 
+def make_query_dict(connection, query, immediate_execute):
+    result = {
+        'enter_func': connection.start,
+        'exit_func': connection.close,
+        'model': query.model
+        'immediate_execute': False
+    }
+    return result
+
 class SQLCompiler(compiler.SQLCompiler):
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
-        """
-        Creates the SQL for this query. Returns the SQL string and list of
-        parameters.
-        If 'with_limits' is False, any limit/offset information is not included
-        in the query.
-        """
-        result = {}
+        result = make_query_dict(self.connection, self.query, False)
         params = []
-        result['return_many_func'] = self.connection.client.list
-        result['return_one_func'] = self.connection.client.get
+        result['return_many_func'] = self.connection.list
+        result['return_one_func'] = self.connection.get
         result['count_func'] = self.connection.count
-        result['model'] = self.query.model
         self.subquery = subquery
         refcounts_before = self.query.alias_refcount.copy()
         try:
@@ -37,6 +39,8 @@ class SQLCompiler(compiler.SQLCompiler):
             from_, f_params = self.get_from_clause()
 
             result['app'], result['model_name'] = from_.split('.')
+            result['app_model'] = from_
+
             params.extend(f_params)
 
             where, w_params = self.compile(self.where) if self.where is not None else ("", [])
@@ -83,8 +87,7 @@ class SQLCompiler(compiler.SQLCompiler):
                             result['limit'] = val
                 result['offset'] = self.query.low_mark
 
-            result['params'] = params
-            return result
+            return result, params
         finally:
             # Finally do cleanup - get rid of the joins we created above.
             self.query.reset_refcounts(refcounts_before)
@@ -92,10 +95,28 @@ class SQLCompiler(compiler.SQLCompiler):
     pass
 
 class SQLInsertCompiler(compiler.SQLInsertCompiler):
-    pass
+
+    def as_sql(self):
+        result = make_query_dict(self.connection, self.query, True)
+        result['return_many_func'] = self.connection.create_bulk
+        result['return_one_func'] = self.connection.create_bulk
+        opts = self.query.get_meta()
+        fields = self.query.fields if result['has_fields'] else [opts.pk]
+        objs=[]
+        for obj in self.query.objs:
+            fields_values = {}
+            for field in fields:
+                fields_values[field.column] = self.pre_save_val(field, obj)
+            objs.append(fields_values)
+        params = objs
+        return result, params
 
 class SQLDeleteCompiler(compiler.SQLDeleteCompiler):
-    pass
+
+    def as_sql(self):
+        result = make_query_dict(self.connection, self.query, True)
+        result['return_many_func'] = self.connection.delete_bulk
+        result['return_one_func'] = self.connection.delete_bulk
 
 class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
     pass
