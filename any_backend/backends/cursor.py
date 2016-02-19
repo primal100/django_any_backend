@@ -1,4 +1,4 @@
-from any_backend.utils import get_db_by_name
+from any_backend.utils import get_db_by_name, convert_to_tuples
 from django.core.cache import caches
 
 class Cursor(object):
@@ -15,10 +15,12 @@ class Cursor(object):
         self.enter_func = query['enter_func']
         self.exit_func = query['exit_func']
         self.model = query['model']
+        self.field_names = query['out_cols']
+        self.count = any('COUNT' in x for x in self.field_names)
         self.immediate_execute = query['immediate_execute']
         self.pk_attname = self.model._meta.pk_attname
-        db_config = get_db_by_name(query['db_config'])
-        self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db.get('CHUNK_SIZE', None)
+        db_config = query['db_config']
+        self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db_config.get('CHUNK_SIZE', None)
         cache_name = db_config.get('CACHE_NAME', None)
         self.cache = caches.get(cache_name, None)
         self.cache_timeout = db_config.get('CACHE_TIMEOUT', 60)
@@ -28,6 +30,7 @@ class Cursor(object):
         self.lastrowid = None
         if self.immediate_execute:
             self.results = self.func(self.params, **self.query)
+            self.getlastrowid()
         else:
             self.results = []
         return self
@@ -36,66 +39,72 @@ class Cursor(object):
         lastrow = self.results[-1]
         self.lastrowid = lastrow[self.pk_attname]
 
-
     def fetchone(self):
         if not self.immediate_execute:
-            self.results = self.func(self.params, **self.query)
-        if any(type(self.results) == x for x in [list, tuple]):
-            self.results = (self.results[0],)
+            if self.count:
+                self.fetchmany()
+                return self.pre_paginate_count
         else:
-            self.results =
+            self.results = self.func(self.params, **self.query)
         self.getlastrowid()
-        return self.results
+        result = [self.results[0]]
+        return convert_to_tuples(result, self.field_names)[0]
 
     def fetchmany(self, size=-1):
         if self.immediate_execute:
-            yield self.results
+            yield convert_to_tuples(self.results, self.field_names)
         else:
             func = self.func
             if self.cache:
-                cache_string = self.cache_request(func)
-                results, pre_paginate_count = self.cache.get(cache_string, default=[[], None])
+                self.results = self.cache.get(default=[], paginated=True)
+                self.pre_paginate_count = self.cache.get(default=(), paginated=False)
             else:
-                results, pre_paginate_count = [], None
-            if results:
-                yield results
+                self.results, self.pre_paginate_count = [], ()
+            if self.results:
+                yield self.results
             else:
+                self.results = results = []
                 chunk_size = self.chunk_size or size
                 max = self.query['limit']
                 self.query['limit'] = self.query['offset'] + chunk_size
                 while self.query['limit'] <= max:
-                    results, pre_paginate_count = func(self.params, **self.query)
-                    results += results
+                    results, self.pre_paginate_count = func(self.params, **self.query)
+                    results = convert_to_tuples(results, self.field_names)
+                    self.results += results
                     self.query['limit'] += chunk_size
                     self.query['offset'] += chunk_size
                     yield results
-                self.cache_result(func, [results, pre_paginate_count])
-            self.results = results
+                self.pre_paginate_count = (self.pre_paginate_count,)
+                self.cache_set(self.results, paginated=True)
+                self.cache_set(self.pre_paginate_count, paginated=False)
             self.getlastrowid()
 
     def fetchall(self):
         return list(self.fetchmany())
 
-    def cache_result(self, func, value, timeout):
+    def cache_get(self, default=None, paginated=False):
         if self.cache:
-            if self.params:
+            string = self.cache_get(self.func, paginated=paginated)
+            return self.cache.get(string, default=default)
+        return None
+
+    def cache_set(self, value, paginated=False):
+        if self.cache:
+            if self.count and not self.params:
                 timeout = self.cache_count_all_timeout
-            string = self.cache_request(func)
+            else:
+                timeout = self.cache_timeout
+            string = self.cache_key(self.func)
             self.cache.set(string, value, timeout)
 
-    def cache_request(self, func):
+    def cache_key(self, func, paginated=False):
         query = self.query.copy()
-        query['limit'] = query['offset'] = 0
+        if not paginated:
+            query['limit'] = query['offset'] = 0
         params = tuple(sorted(query.items()))
         query = tuple(sorted(query.items()))
-        cache_string = str(query) + str(params) + func.__name__
+        cache_string = str(query) + str(params) + self.func.__name__
         return cache_string
-
-    def run(self, func):
-        if self.cache:
-            string = self.cache_request(func)
-            return self.cache.get_or_set(string, func(self.params, **self.query), self.cache_timeout)
-        return func(self.params, **self.query)
 
     def rowcount(self):
         return len(self.results)

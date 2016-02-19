@@ -1,71 +1,68 @@
-from collections import OrderedDict
-
 class Connection(object):
     def __init__(self, cursor):
         self.cursor = cursor
 
-    def create(self, params, **kwargs):
+    def setup(self):
+        pass
+
+
+    def create(self, object=None, model=None, db_config=None):
         """
 
         :param params:
         :param kwargs:
-        :return: id of object successfully created
+        :return: object The object which was successfully created
         """
 
         raise NotImplementedError('You must implement a create function in your connection class')
 
-    def list(self, params, **kwargs):
-        raise NotImplementedError('You must implement a list function in your connection class')
+    def list(self, filters, model=None, db_config=None, app=None, app_model=None, out_cols=None, group_by=None,
+             order_by=None, limit=None, offset=None, page_num=None):
+        raise NotImplementedError('You have not implemented a list function in your connection class')
 
-    def delete(self, params, **kwargs):
-        raise NotImplementedError('You must implement a delete function in your connection class')
+    def delete(self, id, model=None, db_config=None, app=None, app_model=None):
+        raise NotImplementedError('You have not implemented a delete function in your connection class')
 
-    def update(self, params, **kwargs):
-        raise NotImplementedError('You must implement an update function in your connection class')
+    def update(self, id, update_with=None, model=None, db_config=None, app=None, app_model=None):
+        raise NotImplementedError('You have not implemented an update function in your connection class')
 
-    def setup(self):
-        pass
-
-    def get(self, params, **kwargs):
-        return self.list(params, **kwargs)[0]
-
-    def count(self, params, **kwargs):
-        return len(self.list(params, **kwargs))
-
-    def create_bulk(self, params, **kwargs):
-        ids = []
-        objects = kwargs.pop('objects')
+    def create_bulk(self, filters, objects=None, model=None, db_config=None, app=None, app_model=None):
+        created_objects = []
         for obj in objects:
-            kwargs['results'] = [obj]
-            ids.append(self.create(params, **kwargs))
-        return ids
+            obj = self.create(object=obj, model=None, db_config=db_config)
+            created_objects.append(obj)
+        return object
 
-    def delete_bulk(self, params, **kwargs):
+    def get_pks(self, filters, model, db_config):
+        raise NotImplementedError("You have not implemented a get_pks function")
+
+    def delete_bulk(self, filters, model=None, db_config=None, app=None, app_model=None):
         """
 
         :param params:
         :param kwargs:
         :return: ids The list of primary keys successfully deleted
         """
-        ids = []
-        objects = kwargs.pop('results')
-        for obj in objects:
-            kwargs['results'] = [obj]
-            ids.append(self.delete(params, **kwargs))
-        return ids
+        ids = self.get_pks(filters, model, db_config)
 
-    def update_bulk(self, params, **kwargs):
+        deleted_objects = []
+
+        for id in ids:
+            obj = self.delete(id, model=model, db_config=db_config)
+            deleted_objects.append(obj)
+        return deleted_objects
+
+    def update_bulk(self, filters, model=None, update_with=None, db_config=None, app=None, app_model=None, ):
         """
 
         :param params:
         :param kwargs:
         :return: ids The list of primary keys successfully updated
         """
-        ids = []
-        objects = kwargs.pop('results')
-        for obj in objects:
-            kwargs['results'] = [obj]
-            ids.append(self.update(params, **kwargs))
+        ids = self.get_pks(filters, model, db_config)
+
+        for id in ids:
+            self.update(id, model=model, update_with=update_with, db_config=db_config)
         return ids
 
     def enter(self):
@@ -73,35 +70,3 @@ class Connection(object):
 
     def exit(self, exc_type=None, exc_val=None, exc_tb=None):
         pass
-
-    def convert_dict(self, dict, model):
-        values = []
-        for field in model._meta.fields:
-            value = dict[field]
-            if type(value) == dict:
-                value = self.convert_dict(value, field.to)
-            values.append(dict[field])
-        as_tuple = tuple(values)
-        return as_tuple
-
-    def convert_dicts_to_tuples(self, dicts):
-        tuples = []
-        for dict in dicts:
-            tuples.append(self.convert_dict(dict))
-        return tuples
-
-    def convert_object(self, dict, model):
-        values = []
-        for field in model._meta.fields:
-            value = dict[field]
-            if type(value) == dict:
-                value = self.convert_object(value, field.to)
-            values.append(dict[field])
-        as_tuple = tuple(values)
-        return as_tuple
-
-    def convert_dicts_to_tuples(self, objs):
-        tuples = []
-        for dict in dicts:
-            tuples.append(self.convert_object(obj))
-        return tuples

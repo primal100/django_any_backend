@@ -1,5 +1,7 @@
 from django.db.models.sql import compiler
 from django.core.exceptions import FieldError
+from any_backend.utils import get_db_by_name
+from math import ceil
 
 class Client(object):
     """
@@ -19,7 +21,7 @@ def make_dicts(connection, query, immediate_execute, using):
         'exit_func': connection.close,
         'model': query.model,
         'immediate_execute': False,
-        'db_config': query.using
+        'db_config': get_db_by_name(query.using)
     }
     params = {}
     return result, params
@@ -86,6 +88,8 @@ class SQLCompiler(compiler.SQLCompiler):
                         if val:
                             result['limit'] = val
                 result['offset'] = self.query.low_mark
+                result['page_size'] = result['offset'] - result['limit']
+                result['page_num'] = ceil(result['limit'] / result['page_size']) + 1
 
             return result, params
         finally:
@@ -121,7 +125,7 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
     def as_sql(self):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.update_bulk
-        field_values = {}
+        update_with = {}
         for field, model, val in self.query.values:
             if hasattr(val, 'resolve_expression'):
                 val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
@@ -143,10 +147,10 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
                 val = field.get_db_prep_save(val, connection=self.connection)
 
             name = field.column
-            field_values[name] = val
-        if not field_values:
+            update_with[name] = val
+        if not update_with:
             return '', ()
-        result['field_values'] = field_values
+        result['update_with'] = update_with
         return result, params
 
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler):
