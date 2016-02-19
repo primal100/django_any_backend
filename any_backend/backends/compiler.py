@@ -3,18 +3,6 @@ from django.core.exceptions import FieldError
 from any_backend.utils import get_db_by_name
 from math import ceil
 
-class Client(object):
-    """
-    Initialized and setup function run when first connection is made after Django application starts.
-    Can be accessed from within most functions in the other classes as self.using
-    """
-    def setup(self):
-        pass
-
-class DictToObject:
-    def __init__(self, **entries):
-        self.__dict__.update(entries)
-
 def make_dicts(connection, query, immediate_execute, using):
     result = {
         'enter_func': connection.start,
@@ -26,7 +14,15 @@ def make_dicts(connection, query, immediate_execute, using):
     params = {}
     return result, params
 
+
 class SQLCompiler(compiler.SQLCompiler):
+
+    def compile(self, node, select_format=False):
+        filters = []
+        for filter in node.children:
+            filter_obj = Filter(filter.lhs.field, filter.lookup_name, filter.rhs)
+            filters.append(filter_obj
+        return filters
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
         result, params = make_dicts(self.connection, self.query, None)
@@ -43,18 +39,10 @@ class SQLCompiler(compiler.SQLCompiler):
             result['app'], result['model_name'] = from_.split('.')
             result['app_model'] = from_
 
-            """params.extend(f_params)
-
-            where, w_params = self.compile(self.where) if self.where is not None else ("", [])
-            having, h_params = self.compile(self.having) if self.having is not None else ("", [])
-            if where:
-                params.extend(w_params)
-            result['having'] = having
-            params.extend(h_params)"""
+            params = self.compile(self.where) if self.where is not None else ([])
 
             out_cols = []
             for _, (s_column, s_params), alias in self.select + extra_select:
-                #params.extend(s_params)
                 out_cols.append(s_column)
             result['out_cols'] = out_cols
 
@@ -74,7 +62,6 @@ class SQLCompiler(compiler.SQLCompiler):
             if order_by:
                 for _, (o_sql, o_params, _) in order_by:
                     ordering.append(o_sql)
-                    params.extend(o_params)
             result['order_by'] = ordering
 
             if with_limits:
