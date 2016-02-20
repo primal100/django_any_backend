@@ -1,14 +1,18 @@
 from django.db.models.sql import compiler
 from django.core.exceptions import FieldError
 from any_backend.utils import get_db_by_name
-from math import ceil
+from any_backend.paginators import BackendPaginator
+from any_backend.filters import Filters, Filter
+from any_backend.sorting import OrderBy, OrderingList
+from any_backend.distinct import DistinctFields
+from any_backend.update import UpdateParams
 
-def make_dicts(connection, query, immediate_execute, using):
+def make_dicts(connection, query, immediate_execute):
     result = {
         'enter_func': connection.start,
         'exit_func': connection.close,
         'model': query.model,
-        'immediate_execute': False,
+        'immediate_execute': immediate_execute,
         'db_config': get_db_by_name(query.using)
     }
     params = {}
@@ -18,10 +22,10 @@ def make_dicts(connection, query, immediate_execute, using):
 class SQLCompiler(compiler.SQLCompiler):
 
     def compile(self, node, select_format=False):
-        filters = []
+        filters = Filters()
         for filter in node.children:
             filter_obj = Filter(filter.lhs.field, filter.lookup_name, filter.rhs)
-            filters.append(filter_obj
+            filters.append(filter_obj)
         return filters
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
@@ -31,54 +35,34 @@ class SQLCompiler(compiler.SQLCompiler):
         refcounts_before = self.query.alias_refcount.copy()
         try:
             extra_select, order_by, group_by = self.pre_sql_setup()
-            distinct_fields = self.get_distinct()
-            result['distinct'] = self.query.distinct
+
+            distinct = DistinctFields()
+            distinct += self.get_distinct()
+            result['distinct'] = distinct
 
             from_, f_params = self.get_from_clause()
 
             result['app'], result['model_name'] = from_.split('.')
             result['app_model'] = from_
 
-            params = self.compile(self.where) if self.where is not None else ([])
+            filters = self.compile(self.where) if self.where is not None else ([])
 
             out_cols = []
             for _, (s_column, s_params), alias in self.select + extra_select:
                 out_cols.append(s_column)
             result['out_cols'] = out_cols
 
-            grouping = []
-            for g_sql, g_params in group_by:
-                grouping.append(g_sql)
-                #params.extend(g_params)
-            if grouping:
-                if distinct_fields:
-                    raise NotImplementedError(
-                        "annotate() + distinct(fields) is not implemented.")
-                if not order_by:
-                    order_by = self.connection.ops.force_no_ordering()
-            result['group_by'] = grouping
-
-            ordering = []
+            ordering = OrderingList()
             if order_by:
                 for _, (o_sql, o_params, _) in order_by:
-                    ordering.append(o_sql)
+                    orderby = OrderBy(**o_sql)
+                    ordering.append(order_by)
             result['order_by'] = ordering
 
-            if with_limits:
-                if self.query.high_mark is not None:
-                    result['limit'] = self.query.high_mark - self.query.low_mark
-                else:
-                    result['limit'] = None
-                if self.query.low_mark:
-                    if self.query.high_mark is None:
-                        val = self.connection.ops.no_limit_value()
-                        if val:
-                            result['limit'] = val
-                result['offset'] = self.query.low_mark
-                result['page_size'] = result['offset'] - result['limit']
-                result['page_num'] = ceil(result['limit'] / result['page_size']) + 1
+            result['paginator'] = BackendPaginator(with_limits, self.query.high_mark, self.query.low_mark,
+                                                   self.connection.ops.no_limit_value())
 
-            return result, params
+            return result, filters
         finally:
             # Finally do cleanup - get rid of the joins we created above.
             self.query.reset_refcounts(refcounts_before)
@@ -105,14 +89,15 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler):
     def as_sql(self):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.delete_bulk
-        return result, params
+        filters = self.compile(self.where) if self.where is not None else ([])
+        return result, filters
 
 class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
 
     def as_sql(self):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.update_bulk
-        update_with = {}
+        update_with = UpdateParams()
         for field, model, val in self.query.values:
             if hasattr(val, 'resolve_expression'):
                 val = val.resolve_expression(self.query, allow_joins=False, for_save=True)
@@ -138,7 +123,8 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
         if not update_with:
             return '', ()
         result['update_with'] = update_with
-        return result, params
+        filters = self.compile(self.where) if self.where is not None else ([])
+        return result, filters
 
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler):
     def as_sql(self):

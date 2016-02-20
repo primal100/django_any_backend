@@ -7,7 +7,7 @@ def get_db_by_name(name):
 
 def get_compiler_by_db_name(name):
     db = get_db_by_name(name)
-    return db['COMPILER']
+    return db.get('COMPILER', None)
 
 def get_wrapper_by_db_name(name):
     db = get_db_by_name(name)

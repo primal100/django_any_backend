@@ -1,3 +1,18 @@
+class Filters(list):
+    def apply(self, objects, is_dict):
+        for filter in self:
+            objects = filter.apply(objects, is_dict)
+            return objects
+
+    def as_dict(self):
+        dictionary = {}
+        for filter in self:
+            if filter.operator == 'exact':
+                dictionary[filter.field_name] = filter.value
+            elif filter.operator == 'iexact':
+                dictionary[filter.field_name] = filter.value.lower()
+        return dictionary
+
 class Filter(object):
     def __init__(self, field, operator, value):
         self.field = field
@@ -16,7 +31,7 @@ class Filter(object):
         else:
             return value.lower()
 
-    def filter_objects(self, objlist, is_dict):
+    def apply(self, objlist, is_dict):
         if self.operator == 'exact':
             return [d for d in objlist if self.get(d, is_dict, True) == self.value]
         elif self.operator == 'iexact':
@@ -43,3 +58,5 @@ class Filter(object):
             return [d for d in objlist if self.get(d, is_dict, True).endswith(self.value)]
         elif self.operator == 'iendswith':
             return [d for d in objlist if self.get(d, is_dict, False).endswith(self.value.lower())]
+        else:
+            raise NotImplementedError('Operator ' + self.operator + ' not supported.')

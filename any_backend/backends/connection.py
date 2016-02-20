@@ -2,15 +2,18 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from operations import DatabaseOperations
 from importlib import import_module
 from any_backend.utils import get_compiler_by_db_name
+from any_backend.utils import get_db_by_name
 from cursor import Cursor
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     is_non_db = True
-    vendor = 'nondb_backends'
+    default_compiler = 'any_backend.backends.compiler'
 
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
-        compiler_module = get_compiler_by_db_name(args[0])
+        self.db_name = args[0]
+        self.db_config = get_db_by_name(self.db_name)
+        compiler_module = get_compiler_by_db_name(self.db_name) or self.default_compiler
         client = None
         self._cache = import_module(compiler_module)
         self.ops = DatabaseOperations(self, cache=self._cache)
@@ -27,7 +30,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
 
     def get_new_connection(self, conn_params):
         connection_class = conn_params['connection']
-        connection = connection_class(cursor = self.create_cursor())
+        connection = connection_class(self.create_cursor(), self.db_config)
         connection.setup()
         return connection
 

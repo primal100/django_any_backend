@@ -31,6 +31,7 @@ class Cursor(object):
         if self.immediate_execute:
             self.results = self.func(self.params, **self.query)
             self.getlastrowid()
+            self.cache.clear()
         else:
             self.results = []
         return self
