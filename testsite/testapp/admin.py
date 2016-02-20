@@ -1,0 +1,1 @@
+from any_backend.admin import ModelAdmin
