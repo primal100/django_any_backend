@@ -3,7 +3,12 @@ from any_backend.client import Client
 
 class PickleDB(Client):
 
-    def setup(self):
+    def initialize_new(self, db_name):
+        self.filename = db_name
+        self._update_data([])
+
+    def setup(self, db_config):
+        self.db_config = db_config
         self.filename = self.db_config['NAME']
 
     def _get_data(self):
@@ -21,11 +26,10 @@ class PickleDB(Client):
         self._update_data(data)
         return objects
 
-    def list(self, filters, model=None, model_name=None, paginator=None, orderby=None, distinct=None,
+    def list(self, filters, model=None, model_name=None, paginator=None, order_by=None, distinct=None,
              app_model=None, out_cols=None):
         objects = self._get_data()
-        objects = self.apply_all(objects, filters=filters, distinct=distinct, orderby=orderby, paginator=paginator)
-        return objects
+        return self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
 
     def delete_bulk(self, filters, model=None, app_model=None):
         data = self._get_data()

@@ -17,3 +17,6 @@ class DatabaseOperations(BaseDatabaseOperations):
 
     def no_limit_value(self):
         return None
+
+    def quote_name(self, name):
+        return name

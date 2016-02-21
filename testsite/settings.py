@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'any_backend'
+    'any_backend',
+    'testapp'
 ]
 
 MIDDLEWARE_CLASSES = [
@@ -51,7 +52,7 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'any_backend.urls'
+ROOT_URLCONF = 'testsite.urls'
 
 TEMPLATES = [
     {
@@ -69,7 +70,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'any_backend.wsgi.application'
+WSGI_APPLICATION = 'testsite.wsgi.application'
 
 
 # Database
@@ -83,6 +84,11 @@ DATABASES = {
     'pickle_db': {
         'ENGINE': 'any_backend.backends',
         'NAME': os.path.join(BASE_DIR, 'db.pickle'),
+        'CLIENT': 'pickle_db.client.PickleDB',
+        'MODELS': ['country'],
+        'TEST': {
+            'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
+        }
     }
 }
 

@@ -22,3 +22,10 @@ class OrderingList(list):
             return sorted(objects, key=operator.itemgetter(args), reverse=reverse)
         else:
             return sorted(objects, key=operator.attrgetter(args), reverse=reverse)
+
+    def to_dict(self):
+        orderings = []
+        for order in self:
+            orderings.append(order.field_name)
+        reverse = self[0].reverse
+        return {'orderby': orderings, 'reverse': reverse}

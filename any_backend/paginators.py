@@ -38,9 +38,9 @@ class BackendPaginator(object):
     def __init__(self, with_limits, low_mark, high_mark, no_limit_value):
         self.paginated = with_limits
         if self.paginated:
-            self.low_mark = low_mark
+            self.low_mark = low_mark or 0
             self.high_mark = high_mark
-            if self.high_mark is not None:
+            if not self.high_mark:
                 self.limit = self.high_mark - self.low_mark
             else:
                 self.limit = None
@@ -50,8 +50,12 @@ class BackendPaginator(object):
                     if val:
                         self.limit = val
             self.offset = self.low_mark
-            self.page_size = self.offset - self.limit
-            self.page_num = ceil(self.limit / self.page_size) + 1
+            self.page_size = self.limit - self.offset
+            if self.page_size:
+                self.page_num = ceil(self.limit / self.page_size) + 1
+            else:
+                self.paginated = False
+                self.page_num = 1
 
     def apply(self, objects):
         if self.paginated:

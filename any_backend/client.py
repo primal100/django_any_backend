@@ -3,7 +3,16 @@ class Client(object):
         self.cursor = cursor
         self.db_config = db_config
 
-    def setup(self):
+    def initialize_new(self, db_name):
+        """
+        Run when migrate is run the very first time
+        """
+        pass
+
+    def setup(self, db_config):
+        """
+        Run when Django app is started
+        """
         pass
 
     def create(self, object=None, model=None, app_model=None):
@@ -17,7 +26,7 @@ class Client(object):
         raise NotImplementedError('You must implement a create function in your connection class')
 
 
-    def list(self, filters, model=None, model_name=None, paginator=None, orderby=None, distinct=None,
+    def list(self, filters, model=None, model_name=None, paginator=None, order_by=None, distinct=None,
              app_model=None, out_cols=None):
         raise NotImplementedError('You have not implemented a list function in your connection class')
 
@@ -27,16 +36,17 @@ class Client(object):
     def update(self, id, update_with=None, model=None, app_model=None):
         raise NotImplementedError('You have not implemented an update function in your connection class')
 
-    def apply_all(self, objects, filters=None, distinct=None, orderby=None, paginator=None):
+    def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None):
         if filters:
             objects = filters.apply(objects)
         if distinct:
             objects = distinct.apply(objects)
-        if orderby:
-            objects = orderby.apply(objects)
+        count = len(objects)
+        if order_by:
+            objects = order_by.apply(objects)
         if paginator:
             objects = paginator.apply(objects)
-        return objects
+        return objects, count
 
     def create_bulk(self, filters, objects=None, model=None, app_model=None):
         created_objects = []
@@ -80,5 +90,8 @@ class Client(object):
     def enter(self):
         pass
 
-    def exit(self, exc_type=None, exc_val=None, exc_tb=None):
+    def close(self, exc_type=None, exc_val=None, exc_tb=None):
+        pass
+
+    def rollback(self):
         pass

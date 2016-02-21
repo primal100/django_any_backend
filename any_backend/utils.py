@@ -2,7 +2,7 @@ from django.conf import settings
 from importlib import import_module
 
 def get_db_by_name(name):
-    db = settings.DATABASES[name].engine
+    db = settings.DATABASES[name]
     return db
 
 def get_compiler_by_db_name(name):
@@ -11,7 +11,7 @@ def get_compiler_by_db_name(name):
 
 def get_wrapper_by_db_name(name):
     db = get_db_by_name(name)
-    module = import_module(db.connection)
+    module = import_module(db['ENGINE'] + '.base')
     db_wrapper_class = getattr(module, 'DatabaseWrapper')
     return db_wrapper_class
 
@@ -20,9 +20,14 @@ def backend_is_non_db(name):
     is_db = getattr(db_wrapper_class, 'is_non_db', False)
     return not is_db
 
-def model_is_non_db(model):
-    meta = model._meta
-    return getattr(meta, 'nodb_backend', None)
+def get_model_db(model):
+    dbs = settings.DATABASES
+    model_name = model._meta.model_name
+    for k, v in dbs.iteritems():
+        models = v.get('MODELS', [])
+        if any(model_name.lower() == x.lower() for x in models):
+            return k
+    return None
 
 def make_dict_from_obj(object):
     obj2dict = {}
@@ -31,6 +36,12 @@ def make_dict_from_obj(object):
         if not attr.startswith('__'):
             obj2dict[attr] = getattr(object, attr, None)
     return obj2dict
+
+def toDicts(obj_list):
+    dictlist = []
+    for object in obj_list:
+        dictlist.append(make_dict_from_obj(object))
+    return dictlist
 
 def convert_object(object, field_names):
     new_dict = {}
