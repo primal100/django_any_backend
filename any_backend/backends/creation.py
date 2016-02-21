@@ -17,7 +17,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         qn = self.connection.ops.quote_name
 
         params = {
-            'func': self.connection.client.initialize_new,
+            'func': self.connection.client.create_test,
             'enter_func': self.connection.client.enter,
             'exit_func': self.connection.client.close
         }
