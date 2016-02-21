@@ -3,9 +3,9 @@ class Client(object):
         self.cursor = cursor
         self.db_config = db_config
 
-    def initialize_new(self, db_name):
+    def create_test(self, db_name):
         """
-        Run when migrate is run the very first time
+        Run when manage.py tests is run
         """
         pass
 
@@ -15,7 +15,7 @@ class Client(object):
         """
         pass
 
-    def create(self, object=None, model=None, app_model=None):
+    def create(self, model, object, app_model):
         """
 
         :param params:
@@ -26,14 +26,14 @@ class Client(object):
         raise NotImplementedError('You must implement a create function in your connection class')
 
 
-    def list(self, filters, model=None, model_name=None, paginator=None, order_by=None, distinct=None,
-             app_model=None, out_cols=None):
+    def list(self, model, filters, paginator=None, order_by=None, distinct=None,
+             out_cols=None):
         raise NotImplementedError('You have not implemented a list function in your connection class')
 
-    def delete(self, id, model=None, app_model=None):
+    def delete(self, model, id):
         raise NotImplementedError('You have not implemented a delete function in your connection class')
 
-    def update(self, id, update_with=None, model=None, app_model=None):
+    def update(self, model, id, update_with):
         raise NotImplementedError('You have not implemented an update function in your connection class')
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None):
@@ -48,49 +48,52 @@ class Client(object):
             objects = paginator.apply(objects)
         return objects, count
 
-    def create_bulk(self, filters, objects=None, model=None, app_model=None):
+    def get_pks(self, model, filters):
+        raise NotImplementedError("You have not implemented a get_pks function")
+
+    def create_bulk(self, model, objects):
         created_objects = []
         for obj in objects:
-            obj = self.create(object=obj, model=None, app_model=app_model)
+            obj = self.create(model, object)
             created_objects.append(obj)
         return object
 
-    def get_pks(self, filters, model, app_model=None):
-        raise NotImplementedError("You have not implemented a get_pks function")
-
-    def delete_bulk(self, filters, model=None, app_model=None):
+    def delete_bulk(self, model, filters):
         """
 
         :param params:
         :param kwargs:
         :return: ids The list of primary keys successfully deleted
         """
-        ids = self.get_pks(filters, model, app_model=app_model)
+        ids = self.get_pks(model, filters)
 
         deleted_objects = []
 
         for id in ids:
-            obj = self.delete(id, model=model)
+            obj = self.delete(id, model)
             deleted_objects.append(obj)
         return deleted_objects
 
-    def update_bulk(self, filters, model=None, update_with=None, app_model=None):
+    def update_bulk(self, model, filters, update_with=()):
         """
 
         :param params:
         :param kwargs:
         :return: ids The list of primary keys successfully updated
         """
-        ids = self.get_pks(filters, model, app_model=app_model)
+        ids = self.get_pks(model, filters)
 
         for id in ids:
-            self.update(id, model=model, update_with=update_with, app_model=app_model)
+            self.update(model, id, update_with=update_with)
         return ids
 
     def enter(self):
         pass
 
     def close(self, exc_type=None, exc_val=None, exc_tb=None):
+        pass
+
+    def commit(self):
         pass
 
     def rollback(self):

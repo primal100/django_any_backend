@@ -85,7 +85,7 @@ DATABASES = {
         'ENGINE': 'any_backend.backends',
         'NAME': os.path.join(BASE_DIR, 'db.pickle'),
         'CLIENT': 'pickle_db.client.PickleDB',
-        'MODELS': ['country'],
+        'MODELS': ['Country'],
         'TEST': {
             'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
         }

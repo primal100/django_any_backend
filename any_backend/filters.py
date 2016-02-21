@@ -1,7 +1,9 @@
+from utils import getvalue
+
 class Filters(list):
-    def apply(self, objects, is_dict):
+    def apply(self, objects):
         for filter in self:
-            objects = filter.apply(objects, is_dict)
+            objects = filter.apply(objects)
             return objects
 
     def as_dict(self):
@@ -21,42 +23,38 @@ class Filter(object):
         self.operator = operator
         self.value = value
 
-    def get(self, obj, is_dict, sensitive):
-        if is_dict:
-            value = obj[self.field_name]
-        else:
-            value = getattr(obj, self.field_name)
-        if sensitive:
-            return value
-        else:
+    def get(self, obj, sensitive):
+        value = getvalue(obj, self.field_name, returnIfNone='')
+        if not sensitive:
             return value.lower()
+        return value
 
-    def apply(self, objlist, is_dict):
+    def apply(self, objlist):
         if self.operator == 'exact':
-            return [d for d in objlist if self.get(d, is_dict, True) == self.value]
+            return [d for d in objlist if self.get(d, True) == self.value]
         elif self.operator == 'iexact':
-            return [d for d in objlist if self.get(d, is_dict, False) == self.value.lower()]
+            return [d for d in objlist if self.get(d, False) == self.value.lower()]
         elif self.operator == 'contains':
-            return [d for d in objlist if self.value in self.get(d, is_dict, True)]
+            return [d for d in objlist if self.value in self.get(d, True)]
         elif self.operator == 'icontains':
-            return [d for d in objlist if self.value.lower() in self.get(d, is_dict, False)]
+            return [d for d in objlist if self.value.lower() in self.get(d, False)]
         elif self.operator == 'in':
-            return [d for d in objlist if self.get(d, is_dict, True) in self.value]
+            return [d for d in objlist if self.get(d, True) in self.value]
         elif self.operator == 'gt':
-            return [d for d in objlist if self.get(d, is_dict, True) > self.value]
+            return [d for d in objlist if self.get(d, True) > self.value]
         elif self.operator == 'gte':
-            return [d for d in objlist if self.get(d, is_dict, True) >= self.value]
+            return [d for d in objlist if self.get(d, True) >= self.value]
         elif self.operator == 'lt':
-            return [d for d in objlist if self.get(d, is_dict, True) < self.value]
+            return [d for d in objlist if self.get(d, True) < self.value]
         elif self.operator == 'lte':
-            return [d for d in objlist if self.get(d, is_dict, True) <= self.value]
+            return [d for d in objlist if self.get(d, True) <= self.value]
         elif self.operator == 'startswith':
-            return [d for d in objlist if self.get(d, is_dict, True).startswith(self.value)]
+            return [d for d in objlist if self.get(d, True).startswith(self.value)]
         elif self.operator == 'istartswith':
-            return [d for d in objlist if self.get(d, is_dict, False).lower().starswith(self.value.lower())]
+            return [d for d in objlist if self.get(d, False).lower().startswith(self.value.lower())]
         elif self.operator == 'endswith':
-            return [d for d in objlist if self.get(d, is_dict, True).endswith(self.value)]
+            return [d for d in objlist if self.get(d, True).endswith(self.value)]
         elif self.operator == 'iendswith':
-            return [d for d in objlist if self.get(d, is_dict, False).endswith(self.value.lower())]
+            return [d for d in objlist if self.get(d, False).endswith(self.value.lower())]
         else:
             raise NotImplementedError('Operator ' + self.operator + ' not supported.')

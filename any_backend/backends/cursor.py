@@ -30,14 +30,10 @@ class Cursor(object):
             self.func = query.pop('func')
             self.enter_func = query.pop('enter_func')
             self.exit_func = query.pop('exit_func')
-            self.model = query['model']
-            self.fields = query['out_cols']
-            self.field_names = []
-            for field in self.fields:
-                self.field_names.append(field.column)
-            self.count = any('COUNT' in x for x in self.field_names)
+            self.model = query.pop('model')
             self.immediate_execute = query.pop('immediate_execute')
-            self.pk_attname = self.model._meta.pk
+            self.pk_fieldname = self.model._meta.pk.attname
+            self.field_names = [self.pk_fieldname]
             db_config = query.pop('db_config')
             self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db_config.get('CHUNK_SIZE', None)
             cache_name = db_config.get('CACHE_NAME', None)
@@ -49,20 +45,34 @@ class Cursor(object):
                 self.cache = None
             self.query = query
             self.params = params
-            self.lastrowid = None
             if self.immediate_execute:
-                self.results = self.func(self.params, **self.query)
-                self.getlastrowid()
-                self.cache.clear()
+                self.count = False
+                self.pos = 0
+                self.results = self.func(self.model, self.params, **self.query)
+                self.results = convert_to_tuples(self.results, self.field_names)
+                if self.cache:
+                    self.cache.clear()
             else:
-                self.results = []
                 self.pos = query['paginator'].limit
+                self.results = []
+                self.fields = query['out_cols']
+                for field in self.fields:
+                    if field.column not in self.field_names:
+                        self.field_names.append(field.column)
+                self.count = any('COUNT' in x for x in self.field_names)
             return self
 
-    def getlastrowid(self):
+    @property
+    def lastrowid(self):
         if self.results:
             lastrow = self.results[-1]
-            self.lastrowid = lastrow[self.pk_attname]
+            return lastrow[0]
+        else:
+            return None
+
+    @property
+    def rowcount(self):
+        return len(self.results)
 
     def fetchone(self):
         if not self.immediate_execute:
@@ -70,9 +80,8 @@ class Cursor(object):
                 self.fetchmany()
                 return self.pre_paginate_count
         else:
-            self.results = self.func(self.params, **self.query)
-        self.getlastrowid()
-        result = [self.results[0]]
+            self.results = self.func(self.model, self.params, **self.query)
+        result = [self.results[self.pos]]
         self.pos += 1
         return convert_to_tuples(result, self.field_names)[0]
 
@@ -81,20 +90,18 @@ class Cursor(object):
             tuples = convert_to_tuples(self.results, self.field_names)
             return tuples
         func = self.func
-        self.query['paginator'].offset = self.pos
-        self.query['paginator'].limit = self.pos + size
+        self.query['paginator'].update_range(self.pos, self.pos + size)
         if self.cache:
             self.results = self.cache.get(default=[], paginated=True)
             self.pre_paginate_count = self.cache.get(default=(), paginated=False)
             if self.results:
                 return self.results
-        self.results, self.pre_paginate_count = func(self.params, **self.query)
+        self.results, self.pre_paginate_count = func(self.model, self.params, **self.query)
         self.results = convert_to_tuples(self.results, self.field_names)
         self.pre_paginate_count = (self.pre_paginate_count,)
         self.cache_set(self.results, paginated=True)
         self.cache_set(self.pre_paginate_count, paginated=False)
         self.pos += size
-        self.getlastrowid()
         return self.results
 
     def fetchall(self):
@@ -123,9 +130,6 @@ class Cursor(object):
         query = tuple(sorted(query.items()))
         cache_string = str(query) + str(params) + self.func.__name__
         return cache_string
-
-    def rowcount(self):
-        return len(self.results)
 
     def start(self):
         if self.enter_func:

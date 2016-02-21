@@ -26,10 +26,10 @@ class SQLCompiler(compiler.SQLCompiler):
         for filter in node_children:
             filter_obj = Filter(filter.lhs.field, filter.lookup_name, filter.rhs)
             filters.append(filter_obj)
-        return filters, {}
+        return filters
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
-        result, params = make_dicts(self.connection, self.query, None)
+        result, params = make_dicts(self.connection, self.query, False)
         result['func'] = self.connection.client.list
         self.subquery = subquery
         refcounts_before = self.query.alias_refcount.copy()
@@ -42,10 +42,7 @@ class SQLCompiler(compiler.SQLCompiler):
             distinct += self.get_distinct()
             result['distinct'] = distinct
 
-            if hasattr(self, 'where'):
-                filters = self.compile(self.where)[0] if self.where is not None else ([])
-            else:
-                filters = Filters()
+            filters = self.compile(self.query.where) if self.query.where is not None else ([])
 
             out_cols = []
             for column in self.select:
@@ -71,7 +68,7 @@ class SQLCompiler(compiler.SQLCompiler):
 class SQLInsertCompiler(compiler.SQLInsertCompiler):
 
     def as_sql(self):
-        result, params = make_dicts(self.connection, self.query, None)
+        result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.client.create_bulk
         opts = self.query.get_meta()
         has_fields = getattr(result, 'has_fields', None)
@@ -82,20 +79,20 @@ class SQLInsertCompiler(compiler.SQLInsertCompiler):
             for field in fields:
                 fields_values[field.column] = self.pre_save_val(field, obj)
             objs.append(fields_values)
-        result['results'] = objs
-        return result, params
+        params = objs
+        return [[result, params]]
 
-class SQLDeleteCompiler(compiler.SQLDeleteCompiler):
+class SQLDeleteCompiler(compiler.SQLDeleteCompiler, SQLCompiler):
 
-    def as_sql(self):
+    def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.client.delete_bulk
-        filters = self.compile(self.where) if self.where is not None else ([])
+        filters = self.compile(self.query.where) if self.query.where is not None else ([])
         return result, filters
 
-class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
+class SQLUpdateCompiler(compiler.SQLUpdateCompiler, SQLCompiler):
 
-    def as_sql(self):
+    def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.client.update_bulk
         update_with = UpdateParams()
@@ -124,7 +121,7 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler):
         if not update_with:
             return '', ()
         result['update_with'] = update_with
-        filters = self.compile(self.where) if self.where is not None else ([])
+        filters = self.compile(self.query.where)[0] if self.query.where is not None else ([])
         return result, filters
 
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler):

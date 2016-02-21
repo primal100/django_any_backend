@@ -15,6 +15,23 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     is_non_db = True
     default_compiler = 'any_backend.backends.compiler'
 
+    operators = {
+        'exact': '= %s',
+        'iexact': "LIKE %s ESCAPE '\\'",
+        'contains': "LIKE %s ESCAPE '\\'",
+        'icontains': "LIKE %s ESCAPE '\\'",
+        'regex': 'REGEXP %s',
+        'iregex': "REGEXP '(?i)' || %s",
+        'gt': '> %s',
+        'gte': '>= %s',
+        'lt': '< %s',
+        'lte': '<= %s',
+        'startswith': "LIKE %s ESCAPE '\\'",
+        'endswith': "LIKE %s ESCAPE '\\'",
+        'istartswith': "LIKE %s ESCAPE '\\'",
+        'iendswith': "LIKE %s ESCAPE '\\'",
+    }
+
     def __init__(self, *args, **kwargs):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
         self.db_config = args[0]

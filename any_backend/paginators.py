@@ -35,33 +35,39 @@ class APIPaginator(Paginator):
         return self.this_page
 
 class BackendPaginator(object):
-    def __init__(self, with_limits, low_mark, high_mark, no_limit_value):
+    def __init__(self, with_limits, offset, limit, no_limit_value):
         self.paginated = with_limits
         if self.paginated:
-            self.low_mark = low_mark or 0
-            self.high_mark = high_mark
-            if not self.high_mark:
-                self.limit = self.high_mark - self.low_mark
-            else:
-                self.limit = None
-            if self.low_mark:
-                if self.high_mark is None:
+            self.offset = offset or 0
+            self.limit = limit
+            if self.offset:
+                if self.limit is None:
                     val = no_limit_value
                     if val:
                         self.limit = val
-            self.offset = self.low_mark
-            self.page_size = self.limit - self.offset
-            if self.page_size:
-                self.page_num = ceil(self.limit / self.page_size) + 1
-            else:
-                self.paginated = False
-                self.page_num = 1
+            self.update_range(self.offset, self.limit)
+
+    def update_range(self, offset, limit):
+        self.offset = offset
+        self.limit = limit
+        self.page_size = self.limit - self.offset
+        if self.page_size:
+            self.paginated = True
+            self.page_num = ceil(self.limit / self.page_size) + 1
+        else:
+            self.paginated = False
+            self.page_num = 1
 
     def apply(self, objects):
         if self.paginated:
-            return objects[self.low_mark:self.high_mark]
+            if len(objects) > self.limit:
+                return objects[self.offset:self.limit]
+            elif len(objects) > self.offset:
+                return objects[self.offset:len(objects)]
+            else:
+                return []
         else:
             return objects
 
     def as_dict(self):
-        return {'low': self.low_mark, 'high': self.high_mark}
+        return {'low': self.offset, 'high': self.limit}
