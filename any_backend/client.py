@@ -87,6 +87,18 @@ class Client(object):
             self.update(model, id, update_with=update_with)
         return ids
 
+    def get_related(self, model):
+        forward_fields = model._meta._forward_fields_map
+        for fieldname, field in forward_fields.iteritems():
+            if field.is_relation:
+                column_name = field.attname
+                fk_model = field.related_model
+                fk_pk = fk_model._meta.pk.attname
+                yield fieldname, column_name, fk_model, fk_pk
+
+    def check_if_exists(self, filters):
+        pass
+
     def enter(self):
         pass
 

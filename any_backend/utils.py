@@ -51,7 +51,6 @@ def toDicts(obj_list):
 
 def convert_object(object, field_names):
     new_dict = {}
-    object = getattr(object, '__dict__', object)
     for k,v in object.iteritems():
         if isinstance(v, dict):
             new_dict.update(convert_object(v, field_names))

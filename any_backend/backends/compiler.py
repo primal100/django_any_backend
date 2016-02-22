@@ -38,26 +38,35 @@ class SQLCompiler(compiler.SQLCompiler):
 
             self.setup_query()
 
-            distinct = DistinctFields()
-            distinct += self.get_distinct()
-            result['distinct'] = distinct
+            out_cols = []
+            for column in self.select:
+                field = column[0]._output_field
+                if hasattr(field, 'column'):
+                    out_cols.append(field)
+                else:
+                    result['func'] = self.connection.client.get_pks
+                    result['immediate_execute'] = True
+                    break
 
             filters = self.compile(self.query.where) if self.query.where is not None else ([])
 
-            out_cols = []
-            for column in self.select:
-                out_cols.append(column[0]._output_field)
-            result['out_cols'] = out_cols
+            if result['func'] != self.connection.client.get_pks:
 
-            ordering = OrderingList()
-            """if order_by:
-                for _, (o_sql, o_params, _) in order_by:
-                    orderby = OrderBy(**o_sql)
-                    ordering.append(order_by)"""
-            result['order_by'] = ordering
+                result['out_cols'] = out_cols
 
-            result['paginator'] = BackendPaginator(with_limits, self.query.high_mark, self.query.low_mark,
-                                                   self.connection.ops.no_limit_value())
+                distinct = DistinctFields()
+                distinct += self.get_distinct()
+                result['distinct'] = distinct
+
+                ordering = OrderingList()
+                """if order_by:
+                    for _, (o_sql, o_params, _) in order_by:
+                        orderby = OrderBy(**o_sql)
+                        ordering.append(order_by)"""
+                result['order_by'] = ordering
+
+                result['paginator'] = BackendPaginator(with_limits, self.query.high_mark, self.query.low_mark,
+                                                       self.connection.ops.no_limit_value())
 
             return result, filters
         finally:

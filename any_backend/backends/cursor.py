@@ -89,20 +89,21 @@ class Cursor(object):
         if self.immediate_execute:
             tuples = convert_to_tuples(self.results, self.field_names)
             return tuples
-        func = self.func
-        self.query['paginator'].update_range(self.pos, self.pos + size)
-        if self.cache:
-            self.results = self.cache.get(default=[], paginated=True)
-            self.pre_paginate_count = self.cache.get(default=(), paginated=False)
-            if self.results:
-                return self.results
-        self.results, self.pre_paginate_count = func(self.model, self.params, **self.query)
-        self.results = convert_to_tuples(self.results, self.field_names)
-        self.pre_paginate_count = (self.pre_paginate_count,)
-        self.cache_set(self.results, paginated=True)
-        self.cache_set(self.pre_paginate_count, paginated=False)
-        self.pos += size
-        return self.results
+        else:
+            func = self.func
+            self.query['paginator'].update_range(self.pos, self.pos + size)
+            if self.cache:
+                self.results = self.cache.get(default=[], paginated=True)
+                self.pre_paginate_count = self.cache.get(default=(), paginated=False)
+                if self.results:
+                    return self.results
+            self.results, self.pre_paginate_count = func(self.model, self.params, **self.query)
+            self.results = convert_to_tuples(self.results, self.field_names)
+            self.pre_paginate_count = (self.pre_paginate_count,)
+            self.cache_set(self.results, paginated=True)
+            self.cache_set(self.pre_paginate_count, paginated=False)
+            self.pos += size
+            return self.results
 
     def fetchall(self):
         return list(self.fetchmany())

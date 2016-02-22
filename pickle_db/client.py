@@ -27,7 +27,7 @@ class PickleDB(Client):
     def _update_data(self, model=None, new_data=None, new=False):
         if not new:
             self.data = getattr(self, 'data', self._get_data())
-        if model and new_data:
+        if model and new_data != None:
             self.data[model._meta.model_name] = new_data
         elif new:
             self.data = {}
@@ -54,10 +54,22 @@ class PickleDB(Client):
         self._update_data(model=model, new_data=model_list)
         return objects
 
+    def get_pks(self, model, filters):
+        objects = self._get_data(model=model)
+        objects = filters.apply(objects)
+        return objects
+
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
         objects = self._get_data(model=model)
-        return self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
+        objects, count = self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
+        for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
+            for i, object in enumerate(objects):
+                fk_value = object[fk_columnname]
+                kwargs = {fk_pkfield: fk_value}
+                object[fk_fieldname] = fk_model.objects.filter(**kwargs).get()
+                objects[i] = object
+        return objects, count
 
     def delete_bulk(self, model, filters):
         data = self._get_data(model=model)
