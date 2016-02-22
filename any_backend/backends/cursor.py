@@ -1,4 +1,3 @@
-from any_backend.utils import get_db_by_name, convert_to_tuples
 from django.core.cache import caches
 
 class Cursor(object):
@@ -30,11 +29,14 @@ class Cursor(object):
             self.func = query.pop('func')
             self.enter_func = query.pop('enter_func')
             self.exit_func = query.pop('exit_func')
+            self.conversion_func = query.pop('conversion_func')
             self.model = query.pop('model')
             self.immediate_execute = query.pop('immediate_execute')
             self.pk_fieldname = self.model._meta.pk.attname
-            self.field_names = [self.pk_fieldname]
+            self.fieldnames = [(self.pk_fieldname,)]
+            self.pre_paginate_count = None
             db_config = query.pop('db_config')
+            self.max_relation_depth = db_config.get('MAX_RELATION_DEPTH', 10)
             self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db_config.get('CHUNK_SIZE', None)
             cache_name = db_config.get('CACHE_NAME', None)
             if cache_name:
@@ -49,18 +51,34 @@ class Cursor(object):
                 self.count = False
                 self.pos = 0
                 self.results = self.func(self.model, self.params, **self.query)
-                self.results = convert_to_tuples(self.results, self.field_names)
+                self.results = self.conversion_func(self.results, self.fieldnames)
                 if self.cache:
                     self.cache.clear()
             else:
                 self.pos = query['paginator'].limit
                 self.results = []
                 self.fields = query['out_cols']
+                self.count = any('COUNT' in x.column for x in self.fields)
+                self.fieldnames = []
                 for field in self.fields:
-                    if field.column not in self.field_names:
-                        self.field_names.append(field.column)
-                self.count = any('COUNT' in x for x in self.field_names)
+                    field_model = field.model
+                    if field_model == self.model:
+                        field_tuple = (field.column,)
+                    else:
+                        field_tuple = tuple(self.get_related(field, field_model))
+                    self.fieldnames.append(field_tuple)
             return self
+
+    def get_related(self, field, field_model):
+        field_tuple = [field_model._meta.model_name]
+        for relation in field_model._meta._relation_tree:
+            if relation.model == self.model:
+                field_tuple.append(field.column)
+                return field_tuple
+            else:
+                field_tuple.insert(0, field_model._meta.model_name)
+                field_tuple += self.get_related(field, relation.model)
+                return field_tuple
 
     @property
     def lastrowid(self):
@@ -83,27 +101,30 @@ class Cursor(object):
             self.results = self.func(self.model, self.params, **self.query)
         result = [self.results[self.pos]]
         self.pos += 1
-        return convert_to_tuples(result, self.field_names)[0]
+        return self.conversion_func(result, self.fieldnames)[0]
 
     def fetchmany(self, size=-1):
         if self.immediate_execute:
-            tuples = convert_to_tuples(self.results, self.field_names)
+            tuples = self.conversion_func(self.results, self.fieldnames)
             return tuples
         else:
-            func = self.func
-            self.query['paginator'].update_range(self.pos, self.pos + size)
-            if self.cache:
-                self.results = self.cache.get(default=[], paginated=True)
-                self.pre_paginate_count = self.cache.get(default=(), paginated=False)
-                if self.results:
-                    return self.results
-            self.results, self.pre_paginate_count = func(self.model, self.params, **self.query)
-            self.results = convert_to_tuples(self.results, self.field_names)
-            self.pre_paginate_count = (self.pre_paginate_count,)
-            self.cache_set(self.results, paginated=True)
-            self.cache_set(self.pre_paginate_count, paginated=False)
-            self.pos += size
-            return self.results
+            if not self.pre_paginate_count or self.pre_paginate_count >= self.pos:
+                self.query['paginator'].update_range(self.pos, self.pos + size)
+                if self.cache:
+                    self.results = self.cache.get(default=[], paginated=True)
+                    self.pre_paginate_count = self.cache.get(default=(), paginated=False)
+                    if self.results:
+                        return self.results
+                self.results, self.pre_paginate_count = self.func(self.model, self.params, **self.query)
+                self.results = self.conversion_func(self.results, self.fieldnames)
+                self.pre_paginate_count = (self.pre_paginate_count,)
+                self.cache_set(self.results, paginated=True)
+                self.cache_set(self.pre_paginate_count, paginated=False)
+                self.pos += size
+                return self.results
+            else:
+                return []
+
 
     def fetchall(self):
         return list(self.fetchmany())

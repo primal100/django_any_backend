@@ -1,3 +1,5 @@
+from utils import getvalue
+
 class Client(object):
     def __init__(self, cursor, db_config):
         self.cursor = cursor
@@ -95,6 +97,31 @@ class Client(object):
                 fk_model = field.related_model
                 fk_pk = fk_model._meta.pk.attname
                 yield fieldname, column_name, fk_model, fk_pk
+
+    def convert_to_tuple(self, object, fields):
+        values = []
+        for field in fields:
+            value = object
+            for attr in field:
+                value = getvalue(value, attr)
+            values.append(value)
+        return tuple(values)
+
+    def convert_to_tuples(self, objects, field_names):
+        if objects:
+            if type(objects[0]) == tuple:
+                return objects
+            elif type(objects[0]) == list:
+                for index, obj in enumerate(objects):
+                    objects[index] = tuple(obj)
+                return objects
+            else:
+                list_of_tuples = []
+                for object in objects:
+                    list_of_tuples.append(self.convert_to_tuple(object, field_names))
+                return list_of_tuples
+        else:
+            return []
 
     def check_if_exists(self, filters):
         pass

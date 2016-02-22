@@ -37,47 +37,30 @@ def make_dict_from_obj(object):
             obj2dict[attr] = getattr(object, attr, None)
     return obj2dict
 
-def getvalue(object, attr, returnIfNone=None):
-    if hasattr(object, '__getitem__'):
-        return object.get(attr, returnIfNone)
-    else:
-        return getattr(object, attr, returnIfNone)
+def getvalue(object, attr, returnIfNone='raise'):
+    value_set, value = False, ''
+    attrs = [attr, attr.lower(), attr.capitalize(), attr.upper()]
+    for i, has in enumerate([hasattr(object, x) for x in attrs]):
+        if has:
+            value = getattr(object, attrs[i])
+            value_set = True
+            break
+    if value_set:
+        return value
+    keys = object.keys()
+    for i, has in enumerate([x in keys for x in attrs]):
+        if has:
+            value = object[attrs[i]]
+            value_set = True
+            break
+    if value_set:
+        return value
+    elif returnIfNone == 'raise':
+       raise ValueError('Value for ' + attr + ' not found')
+    return returnIfNone
 
 def toDicts(obj_list):
     dictlist = []
     for object in obj_list:
         dictlist.append(make_dict_from_obj(object))
     return dictlist
-
-def convert_object(object, field_names):
-    new_dict = {}
-    for k,v in object.iteritems():
-        if isinstance(v, dict):
-            new_dict.update(convert_object(v, field_names))
-        elif hasattr(v, '__dict__'):
-            obj2dict = make_dict_from_obj(v)
-            new_dict.update(convert_object(obj2dict, field_names))
-        elif any(k in f for f in field_names):
-            index = field_names.index(k)
-            new_dict[index] = v
-    return new_dict
-
-def convert_to_tuples(objects, field_names):
-    if objects:
-        if type(objects[0]) == tuple:
-            return objects
-        elif type(objects[0]) == list:
-            for index, obj in enumerate(objects):
-                objects[index] = tuple(obj)
-            return objects
-        else:
-            list_of_tuples = []
-            for object in objects:
-                new_dict = convert_object(object, field_names)
-                values = []
-                for i in xrange(0, len(field_names)):
-                    values.append(new_dict[i])
-                list_of_tuples.append(tuple(values))
-            return list_of_tuples
-    else:
-        return []

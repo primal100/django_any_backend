@@ -10,6 +10,7 @@ def make_dicts(connection, query, immediate_execute):
     result = {
         'enter_func': connection.client.enter,
         'exit_func': connection.client.close,
+        'conversion_func': connection.client.convert_to_tuples,
         'model': query.model,
         'immediate_execute': immediate_execute,
         'db_config': connection.settings_dict
