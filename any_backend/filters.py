@@ -4,7 +4,7 @@ class Filters(list):
     def apply(self, objects):
         for filter in self:
             objects = filter.apply(objects)
-            return objects
+        return objects
 
     def as_dict(self):
         dictionary = {}
@@ -18,12 +18,13 @@ class Filters(list):
 class Filter(object):
     def __init__(self, field, operator, value):
         self.field = field
-        self.field_name = field.name
+        self.field_name = field.column
         self.field_type = field.get_internal_type()
         self.operator = operator
         self.value = value
 
     def get(self, obj, sensitive):
+
         value = getvalue(obj, self.field_name, returnIfNone='')
         if not sensitive:
             return value.lower()

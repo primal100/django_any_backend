@@ -47,18 +47,17 @@ class Cursor(object):
                 self.cache = None
             self.query = query
             self.params = params
+            self.pos = 0
             if self.immediate_execute:
                 self.count = False
-                self.pos = 0
                 self.results = self.func(self.model, self.params, **self.query)
                 self.results = self.conversion_func(self.results, self.fieldnames)
                 if self.cache:
                     self.cache.clear()
             else:
-                self.pos = query['paginator'].limit
                 self.results = []
                 self.fields = query['out_cols']
-                self.count = any('COUNT' in x.column for x in self.fields)
+                self.count = query.pop('count', None) or any('COUNT' in x.column for x in self.fields)
                 self.fieldnames = []
                 for field in self.fields:
                     field_model = field.model
@@ -67,6 +66,7 @@ class Cursor(object):
                     else:
                         field_tuple = tuple(self.get_related(field, field_model))
                     self.fieldnames.append(field_tuple)
+                self.max = self.query['paginator'].limit or 1
             return self
 
     def get_related(self, field, field_model):
@@ -103,13 +103,19 @@ class Cursor(object):
         self.pos += 1
         return self.conversion_func(result, self.fieldnames)[0]
 
-    def fetchmany(self, size=-1):
+    def fetchmany(self, size=0):
         if self.immediate_execute:
             tuples = self.conversion_func(self.results, self.fieldnames)
             return tuples
         else:
-            if not self.pre_paginate_count or self.pre_paginate_count >= self.pos:
-                self.query['paginator'].update_range(self.pos, self.pos + size)
+            new_offset = self.query['paginator'].offset + self.pos
+            new_limit = self.pos + size
+            if new_limit > self.max:
+                new_limit = self.max
+            if new_offset > self.max:
+                return []
+            if not self.pre_paginate_count or new_offset <= max:
+                self.query['paginator'].update_range(new_offset, new_limit)
                 if self.cache:
                     self.results = self.cache.get(default=[], paginated=True)
                     self.pre_paginate_count = self.cache.get(default=(), paginated=False)
@@ -121,7 +127,10 @@ class Cursor(object):
                 self.cache_set(self.results, paginated=True)
                 self.cache_set(self.pre_paginate_count, paginated=False)
                 self.pos += size
-                return self.results
+                if self.count:
+                    return self.pre_paginate_count
+                else:
+                    return self.results
             else:
                 return []
 

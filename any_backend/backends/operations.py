@@ -18,7 +18,9 @@ class DatabaseOperations(BaseDatabaseOperations):
         return getattr(self._cache, compiler_name)
 
     def no_limit_value(self):
-        return None
+        if 'NO_LIMIT_VALUE' in self.connection.db_config:
+            return self.connection.db_config['NO_LIMIT_VALUE']
+        return 1000
 
     def quote_name(self, name):
         return name

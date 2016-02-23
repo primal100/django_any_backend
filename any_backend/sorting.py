@@ -12,21 +12,41 @@ class OrderBy(object):
 
 class OrderingList(list):
 
-    def apply(self, objects,  exclude_columns=None):
+    def apply(self, objects,  exclude_columns=()):
         for column in exclude_columns:
             self.remove(column)
-        args = []
-        for column in self:
-            args.append(column.field_name)
-        reverse = self[0].reverse
-        if hasattr(objects[0], '__getitem__'):
-            return sorted(objects, key=operator.itemgetter(args), reverse=reverse)
+        args, reverse = self.to_list()
+        if objects:
+            if hasattr(objects[0], '__getitem__'):
+                return sorted(objects, key=operator.itemgetter(*args), reverse=reverse)
+            else:
+                return sorted(objects, key=operator.attrgetter(*args), reverse=reverse)
         else:
-            return sorted(objects, key=operator.attrgetter(args), reverse=reverse)
+            return objects
 
-    def to_dict(self):
-        orderings = []
-        for order in self:
-            orderings.append(order.field_name)
-        reverse = self[0].reverse
-        return {'orderby': orderings, 'reverse': reverse}
+    def to_list(self):
+        ordering = []
+        reverse = False
+        reverse_set = False
+        for column in self:
+            if column.startswith('-'):
+                name = column.split('-')[1]
+                ordering.append(name)
+                if not reverse_set:
+                    reverse = True
+            else:
+                ordering.append(column)
+                if not reverse_set:
+                    reverse = False
+            reverse_set = True
+        return ordering, reverse
+
+    def to_dicts(self):
+        ordering = []
+        for column in self:
+            if column.startswith('-'):
+                name = column.split('-')[1]
+                ordering.append({'column': name, 'reverse': True})
+            else:
+                ordering.append({'column': column, 'reverse': False})
+        return ordering

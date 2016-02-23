@@ -25,8 +25,9 @@ class SQLCompiler(compiler.SQLCompiler):
         filters = Filters()
         node_children = getattr(node, 'children', [])
         for filter in node_children:
-            filter_obj = Filter(filter.lhs.field, filter.lookup_name, filter.rhs)
-            filters.append(filter_obj)
+            if hasattr(filter, 'lhs') and hasattr(filter, 'rhs'):
+                filter_obj = Filter(filter.lhs.field, filter.lookup_name, filter.rhs)
+                filters.append(filter_obj)
         return filters
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
@@ -39,11 +40,14 @@ class SQLCompiler(compiler.SQLCompiler):
 
             self.setup_query()
 
+            result['count'] = False
             out_cols = []
             for column in self.select:
                 field = column[0]._output_field
                 if hasattr(field, 'column'):
                     out_cols.append(field)
+                elif 'count' in str(column):
+                    result['count'] = True
                 else:
                     result['func'] = self.connection.client.get_pks
                     result['immediate_execute'] = True
@@ -60,13 +64,16 @@ class SQLCompiler(compiler.SQLCompiler):
                 result['distinct'] = distinct
 
                 ordering = OrderingList()
-                """if order_by:
-                    for _, (o_sql, o_params, _) in order_by:
-                        orderby = OrderBy(**o_sql)
-                        ordering.append(order_by)"""
+                pk_attname = self.query.model._meta.pk.attname
+                for i, order_by in enumerate(self.query.order_by):
+                    if order_by == 'pk':
+                        self.query.order_by[i] = pk_attname
+                    elif order_by == '-pk':
+                        self.query.order_by[i] = '-' + pk_attname
+                ordering += self.query.order_by
                 result['order_by'] = ordering
 
-                result['paginator'] = BackendPaginator(with_limits, self.query.high_mark, self.query.low_mark,
+                result['paginator'] = BackendPaginator(with_limits, self.query.low_mark, self.query.high_mark,
                                                        self.connection.ops.no_limit_value())
 
             return result, filters

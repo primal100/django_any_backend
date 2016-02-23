@@ -8,10 +8,10 @@ class APIPaginator(Paginator):
                  allow_empty_first_page=True, request=None, page_num=None):
         super(APIPaginator, self).__init__(object_list, per_page, orphans=orphans,
                                            allow_empty_first_page=allow_empty_first_page)
-        self.page_num = None
-        if page_num or request:
-            self.page_num = page_num or request.GET.get(PAGE_VAR, None)
-        self.this_page = None
+        page_num = page_num
+        if not page_num and request:
+            page_num = int(request.GET.get(PAGE_VAR, 0))
+        self.this_page = self.page(page_num + 1)
 
     def _get_count(self):
         """
@@ -19,7 +19,7 @@ class APIPaginator(Paginator):
         """
         if self._count is None:
             try:
-                self.this_page = self.page(self.page_num)
+                #self.this_page = self.page(self.page_num)
                 self._count = self.object_list.count()
             except (AttributeError, TypeError):
                 # AttributeError if object_list has no count() method.
@@ -28,11 +28,6 @@ class APIPaginator(Paginator):
                 self._count = len(self.object_list)
         return self._count
     count = property(_get_count)
-
-    def page(self, number):
-        if getattr(self.this_page, number, None) != number:
-             self.this_page = super(APIPaginator, self).page(number)
-        return self.this_page
 
 class BackendPaginator(object):
     def __init__(self, with_limits, offset, limit, no_limit_value):
@@ -45,15 +40,19 @@ class BackendPaginator(object):
                     val = no_limit_value
                     if val:
                         self.limit = val
-            self.update_range(self.offset, self.limit)
+            elif self.limit is None:
+                self.limit = 0
+            self.update_range(self.offset, self.limit, True)
 
-    def update_range(self, offset, limit):
+    def update_range(self, offset, limit, initial=False):
+        new_page_size = limit - offset
         self.offset = offset
         self.limit = limit
-        self.page_size = self.limit - self.offset
+        self.page_size = new_page_size
         if self.page_size:
             self.paginated = True
-            self.page_num = ceil(self.limit / self.page_size) + 1
+            self.page_num = ceil(self.offset / self.page_size) + 1
+            pass
         else:
             self.paginated = False
             self.page_num = 1
