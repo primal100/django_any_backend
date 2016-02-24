@@ -24,6 +24,7 @@ class PersonAdmin(TabularInline):
 class CompanyAdmin(ModelAdmin):
     list_display = ('name', 'location')
     inlines = (PersonAdmin, )
+    list_per_page = 3
 
 admin.site.register(Company, CompanyAdmin)
 admin.site.register(Country, CountryAdmin)

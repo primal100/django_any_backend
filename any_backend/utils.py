@@ -22,10 +22,10 @@ def backend_is_non_db(name):
 
 def get_model_db(model):
     dbs = settings.DATABASES
-    model_name = model._meta.model_name
+    db_table = model._meta.db_table
     for k, v in dbs.iteritems():
         models = v.get('MODELS', [])
-        if any(model_name.lower() == x.lower() for x in models):
+        if any(db_table.lower() == x.lower() for x in models):
             return k
     return None
 

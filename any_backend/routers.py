@@ -26,5 +26,4 @@ class BackendRouter(object):
         return None
 
     def allow_migrate(self, db, app_label, model=None, **hints):
-        pass
         return backend_is_non_db(db)
