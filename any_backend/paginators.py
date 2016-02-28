@@ -42,6 +42,8 @@ class BackendPaginator(object):
                         self.limit = val
             elif self.limit is None:
                 self.limit = 0
+            self.initial_offset = self.offset
+            self.initial_limit = self.limit
             self.update_range(self.offset, self.limit, True)
 
     def update_range(self, offset, limit, initial=False):
@@ -52,7 +54,6 @@ class BackendPaginator(object):
         if self.page_size:
             self.paginated = True
             self.page_num = ceil(self.offset / self.page_size) + 1
-            pass
         else:
             self.paginated = False
             self.page_num = 1

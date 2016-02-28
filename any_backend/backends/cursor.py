@@ -14,14 +14,7 @@ class Cursor(object):
         self.close(exc_type=exc_tb, exc_val=exc_val, exc_tb=exc_tb)
 
     def execute(self, query, params=None):
-        if 'CREATE DATABASE' in query:
-            self.func = params['func']
-            self.enter_func = params['enter_func']
-            self.exit_func = params['exit_func']
-            db_name = query.split('CREATE DATABASE ')[1]
-            self.func(db_name)
-            return self
-        elif 'CREATE TABLE' in query:
+        if 'CREATE TABLE' in query:
             self.enter_func = None
             self.exit_func = None
             return self
@@ -49,11 +42,14 @@ class Cursor(object):
             self.params = params
             self.pos = 0
             if self.immediate_execute:
-                self.count = False
-                self.results = self.func(self.model, self.params, **self.query)
-                self.results = self.conversion_func(self.results, self.fieldnames)
-                if self.cache:
-                    self.cache.clear()
+                if self.model._meta.db_table == 'django_migrations':
+                    self.results = []
+                else:
+                    self.count = False
+                    self.results = self.func(self.model, self.params, **self.query)
+                    self.results = self.conversion_func(self.results, self.fieldnames)
+                    if self.cache:
+                        self.cache.clear()
             else:
                 self.results = []
                 self.fields = query['out_cols']
@@ -66,7 +62,6 @@ class Cursor(object):
                     else:
                         field_tuple = tuple(self.get_related(field, field_model))
                     self.fieldnames.append(field_tuple)
-                self.max = self.query['paginator'].limit or 1
             return self
 
     def get_related(self, field, field_model):
@@ -107,14 +102,18 @@ class Cursor(object):
         if self.immediate_execute:
             tuples = self.conversion_func(self.results, self.fieldnames)
             return tuples
+        elif self.model._meta.db_table == 'django_migrations':
+            self.results, self.pre_paginate_count = [], 0
+            return self.results
         else:
-            new_offset = self.query['paginator'].offset + self.pos
-            new_limit = self.pos + size
-            if new_limit > self.max:
-                new_limit = self.max
-            if new_offset > self.max:
-                return []
-            if not self.pre_paginate_count or new_offset <= max:
+            new_offset = self.query['paginator'].initial_offset + self.pos
+            new_limit = self.pos + size - 1
+            if self.query['paginator'].initial_limit:
+                if new_offset > self.query['paginator'].initial_limit:
+                    return []
+                if new_limit > self.query['paginator'].initial_limit:
+                    new_limit = self.query['paginator'].initial_limit
+            if not self.pre_paginate_count or new_offset <= self.query['paginator'].initial_limit:
                 self.query['paginator'].update_range(new_offset, new_limit)
                 if self.cache:
                     self.results = self.cache.get(default=[], paginated=True)
@@ -123,6 +122,8 @@ class Cursor(object):
                         return self.results
                 self.results, self.pre_paginate_count = self.func(self.model, self.params, **self.query)
                 self.results = self.conversion_func(self.results, self.fieldnames)
+                if not self.query['paginator'].initial_limit:
+                    self.query['paginator'].initial_limit = self.pre_paginate_count
                 self.pre_paginate_count = (self.pre_paginate_count,)
                 self.cache_set(self.results, paginated=True)
                 self.cache_set(self.pre_paginate_count, paginated=False)

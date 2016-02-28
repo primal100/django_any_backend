@@ -21,12 +21,12 @@ class PickleTest(TestCase):
                 model.save()
 
     def test_all(self):
-        equalto = ''
-        self.assertEqual('', equalto)
+        equalto = Country.objects.all()
+        self.assertEqual(Country.objects.all(), equalto)
 
-    """def test_get(self):
+    def test_get(self):
         equalto = ''
-        self.assertEqual(make_dict_from_obj(Country.objects.get(id=1)), equalto)
+        self.assertEqual(make_dict_from_obj(Country.objects.get(id='AU')), equalto)
 
     def test_first(self):
         equalto = ''
@@ -53,7 +53,7 @@ class PickleTest(TestCase):
         self.assertEqual(toDicts(Country.objects.all().order_by('-name'))[5:10], equalto)
 
     def test_count(self):
-        equalto = len(countries)
+        equalto = ''
         self.assertEqual(toDicts(Country.objects.all().count()), equalto)
 
     def test_count_with_filter(self):
@@ -94,4 +94,4 @@ class PickleTest(TestCase):
         equalto = ''
         self.assertEqual(Country.objects.filter(**filter).delete(), equalto)
         self.assertRaises(make_dict_from_obj(
-        Country.objects.filter(**filter).get()), ObjectDoesNotExist)"""
+        Country.objects.filter(**filter).get()), ObjectDoesNotExist)

@@ -11,6 +11,12 @@ class Client(object):
         """
         pass
 
+    def delete_test(self, db_name):
+        """
+        Run when manage.py tests is run if test nondb-backend cannot be created
+        """
+        pass
+
     def setup(self, db_config):
         """
         Run when Django app is started

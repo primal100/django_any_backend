@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'any_backend',
-    'testapp'
+    'sql_testapp'
 ]
 
 MIDDLEWARE_CLASSES = [
@@ -52,7 +52,7 @@ MIDDLEWARE_CLASSES = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'testsite.urls'
+ROOT_URLCONF = 'sql_testsite.urls'
 
 TEMPLATES = [
     {
@@ -70,7 +70,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'testsite.wsgi.application'
+WSGI_APPLICATION = 'sql_testsite.wsgi.application'
 
 
 # Database
@@ -79,20 +79,9 @@ WSGI_APPLICATION = 'testsite.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        'NAME': os.path.join(BASE_DIR, 'sql_testapp.sqlite3'),
     },
-    'pickle_db': {
-        'ENGINE': 'any_backend.backends',
-        'NAME': os.path.join(BASE_DIR, 'db.pickle'),
-        'CLIENT': 'pickle_db.client.PickleDB',
-        'MODELS': ['testapp_country', 'testapp_subdivision'],
-        'TEST': {
-            'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
-        }
-    }
 }
-
-DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators

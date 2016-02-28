@@ -7,12 +7,17 @@ class PickleDB(Client):
 
     def create_test(self, db_name):
         self.filename = db_name
-        self.models = self.db_config['MODELS']
-        self._update_data(new=True)
+        self.initialize()
+
+    def delete_test(self, db_name):
+        os.remove(db_name)
 
     def setup(self, db_config):
         self.db_config = db_config
-        self.filename = getattr(self, 'filename', self.db_config['NAME'])
+        self.filename = getattr(self, 'filename', self.db_config['NAME']) or self.db_config['TEST']['NAME']
+        self.initialize()
+
+    def initialize(self):
         self.models = self.db_config['MODELS']
         if not os.path.exists(self.filename):
             self._update_data(new=True)
@@ -21,14 +26,14 @@ class PickleDB(Client):
         with open(self.filename, 'rb') as handle:
             self.data = pickle.load(handle)
         if model:
-            return self.data[model._meta.model_name]
+            return self.data[model._meta.db_table]
         return self.data
 
     def _update_data(self, model=None, new_data=None, new=False):
         if not new:
             self.data = getattr(self, 'data', self._get_data())
         if model and new_data != None:
-            self.data[model._meta.model_name] = new_data
+            self.data[model._meta.db_table] = new_data
         elif new:
             self.data = {}
             for model in self.models:

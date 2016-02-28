@@ -1,17 +1,17 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin, TabularInline
 from any_backend.admin import ModelAdmin as CustomMA
-from models import Country, Person, Footballer, Company
+from models import Country, Person, Subdivision, Company
 
-class FootballerAdmin(TabularInline):
+class SubdivisionAdmin(TabularInline):
     list_display = ('name', 'club', 'age')
-    model = Footballer
+    model = Subdivision
     can_delete = True
-    fields = ('name', 'club', 'age')
+    fields = ('name', 'code', 'country', 'type')
 
 class CountryAdmin(CustomMA):
-    list_display = ('name', 'continent', 'city')
-    inlines = (FootballerAdmin, )
+    list_display = ('name', 'alpha2', 'numeric')
+    inlines = (SubdivisionAdmin, )
     list_max_show_all = True
     list_per_page = 3
 

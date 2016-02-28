@@ -17,10 +17,10 @@ def get_wrapper_by_db_name(name):
 
 def backend_is_non_db(name):
     db_wrapper_class = get_wrapper_by_db_name(name)
-    is_db = getattr(db_wrapper_class, 'is_non_db', False)
-    return not is_db
+    is_non_db = getattr(db_wrapper_class, 'is_non_db', False)
+    return is_non_db
 
-def get_model_db(model):
+def get_db_for_model(model):
     dbs = settings.DATABASES
     db_table = model._meta.db_table
     for k, v in dbs.iteritems():

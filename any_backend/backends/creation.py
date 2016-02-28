@@ -1,4 +1,5 @@
 from django.db.backends.base.creation import BaseDatabaseCreation
+import sys
 
 class DatabaseCreation(BaseDatabaseCreation):
 
@@ -14,51 +15,37 @@ class DatabaseCreation(BaseDatabaseCreation):
         if keepdb:
             return test_database_name
 
-        qn = self.connection.ops.quote_name
-
-        params = {
-            'func': self.connection.client.create_test,
-            'enter_func': self.connection.client.enter,
-            'exit_func': self.connection.client.close
-        }
-
-        # Create the test database and connect to it.
-        with self._nodb_connection.cursor() as cursor:
-            try:
-                cursor.execute(
-                    "CREATE DATABASE %s " % test_database_name, params=params)
-            except Exception as e:
-                # if we want to keep the db, then no need to do any of the below,
-                # just return and skip it all.
+        try:
+            self.connection.client.create_test(test_database_name),
+        except Exception as e:
                 if keepdb:
                     return test_database_name
-
                 sys.stderr.write(
-                    "Got an error creating the test database: %s\n" % e)
+                    "Got an error creating the test non-database backend: %s\n" % e)
                 if not autoclobber:
                     confirm = input(
                         "Type 'yes' if you would like to try deleting the test "
-                        "database '%s', or 'no' to cancel: " % test_database_name)
+                        "non-database backend '%s', or 'no' to cancel: " % test_database_name)
                 if autoclobber or confirm == 'yes':
                     try:
                         if verbosity >= 1:
-                            print("Destroying old test database for alias %s..." % (
+                            print("Destroying old test non-db backend for alias %s..." % (
                                 self._get_database_display_str(verbosity, test_database_name),
                             ))
-                        cursor.execute(
-                            "DROP DATABASE %s" % qn(test_database_name))
-                        cursor.execute(
-                            "CREATE DATABASE %s %s" % (qn(test_database_name),
-                                                       suffix))
+                        self.connection.client.delete_test(test_database_name)
+                        self.connection.client.create_test(test_database_name)
                     except Exception as e:
                         sys.stderr.write(
-                            "Got an error recreating the test database: %s\n" % e)
+                            "Got an error recreating the test non-db backend: %s\n" % e)
                         sys.exit(2)
                 else:
                     print("Tests cancelled.")
                     sys.exit(1)
 
         return test_database_name
+
+    def _destroy_test_db(self, test_database_name, verbosity):
+        self.connection.client.delete_test(test_database_name)
 
     def test_db_signature(self):
         """
