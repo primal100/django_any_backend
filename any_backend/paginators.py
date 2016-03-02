@@ -30,44 +30,38 @@ class APIPaginator(Paginator):
     count = property(_get_count)
 
 class BackendPaginator(object):
-    def __init__(self, with_limits, offset, limit, no_limit_value):
+    def __init__(self, with_limits, low_mark, high_mark, no_limit_value):
         self.paginated = with_limits
-        if self.paginated:
-            self.offset = offset or 0
-            self.limit = limit
-            if self.offset:
-                if self.limit is None:
-                    val = no_limit_value
-                    if val:
-                        self.limit = val
-            elif self.limit is None:
-                self.limit = 0
-            self.initial_offset = self.offset
-            self.initial_limit = self.limit
-            self.update_range(self.offset, self.limit, True)
-
-    def update_range(self, offset, limit, initial=False):
-        new_page_size = limit - offset
-        self.offset = offset
-        self.limit = limit
-        self.page_size = new_page_size
-        if self.page_size:
-            self.paginated = True
-            self.page_num = ceil(self.offset / self.page_size) + 1
-        else:
+        if not low_mark and not high_mark:
             self.paginated = False
-            self.page_num = 1
+        if self.paginated:
+            self.paginate(low_mark, high_mark, no_limit_value)
+
+    def paginate(self, low_mark, high_mark, no_limit_value):
+        self.low_mark = low_mark or 0
+        self.high_mark = high_mark
+        if not self.high_mark:
+                self.high_mark = no_limit_value
+        self.page_size = self.high_mark - self.low_mark + 1
+        self.page_num = ceil(self.low_mark / self.page_size) + 1
+
+    def update(self, pos, size):
+        if size:
+            low_mark = self.low_mark =+ pos
+            high_mark = low_mark + size - 1
+            self.paginated = True
+            self.paginate(low_mark, high_mark, None)
 
     def apply(self, objects):
         if self.paginated:
-            if len(objects) > self.limit:
-                return objects[self.offset:self.limit]
-            elif len(objects) > self.offset:
-                return objects[self.offset:len(objects)]
+            if len(objects) > self.high_mark:
+                return objects[self.low_mark:self.high_mark + 1]
+            elif len(objects) > self.low_mark:
+                return objects[self.low_mark:len(objects) + 1]
             else:
                 return []
         else:
             return objects
 
     def as_dict(self):
-        return {'low': self.offset, 'high': self.limit}
+        return {'low': self.low_mark, 'high': self.high_mark}

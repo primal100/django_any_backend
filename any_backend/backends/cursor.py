@@ -33,7 +33,7 @@ class Cursor(object):
             self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db_config.get('CHUNK_SIZE', None)
             cache_name = db_config.get('CACHE_NAME', None)
             if cache_name:
-                self.cache = caches.get['CACHE_NAME']
+                self.cache = caches[cache_name]
                 self.cache_timeout = db_config.get('CACHE_TIMEOUT', 60)
                 self.cache_count_all_timeout = db_config.get('CACHE_COUNT_ALL_TIMEOUT', self.cache_timeout)
             else:
@@ -50,8 +50,14 @@ class Cursor(object):
                     self.results = self.conversion_func(self.results, self.fieldnames)
                     if self.cache:
                         self.cache.clear()
-            else:
+            elif self.model._meta.db_table != 'django_migrations':
                 self.results = []
+                if 'paginator' in self.query:
+                    self.paginated = self.query['paginator'].paginated
+                    if self.paginated:
+                        self.page_size = self.query['paginator'].page_size
+                self.size = self.model.max_per_request
+                self.full_request_size = None
                 self.fields = query['out_cols']
                 self.count = query.pop('count', None) or any('COUNT' in x.column for x in self.fields)
                 self.fieldnames = []
@@ -106,15 +112,8 @@ class Cursor(object):
             self.results, self.pre_paginate_count = [], 0
             return self.results
         else:
-            new_offset = self.query['paginator'].initial_offset + self.pos
-            new_limit = self.pos + size - 1
-            if self.query['paginator'].initial_limit:
-                if new_offset > self.query['paginator'].initial_limit:
-                    return []
-                if new_limit > self.query['paginator'].initial_limit:
-                    new_limit = self.query['paginator'].initial_limit
-            if not self.pre_paginate_count or new_offset <= self.query['paginator'].initial_limit:
-                self.query['paginator'].update_range(new_offset, new_limit)
+            if not self.full_request_size or self.pos <= self.full_request_size:
+                self.query['paginator'].update(self.pos, self.size)
                 if self.cache:
                     self.results = self.cache.get(default=[], paginated=True)
                     self.pre_paginate_count = self.cache.get(default=(), paginated=False)
@@ -122,12 +121,14 @@ class Cursor(object):
                         return self.results
                 self.results, self.pre_paginate_count = self.func(self.model, self.params, **self.query)
                 self.results = self.conversion_func(self.results, self.fieldnames)
-                if not self.query['paginator'].initial_limit:
-                    self.query['paginator'].initial_limit = self.pre_paginate_count
+                self.full_request_size = self.page_size if self.paginated else self.pre_paginate_count
+                if self.size:
+                    self.pos += size
+                else:
+                    self.pos += self.pre_paginate_count + 1
                 self.pre_paginate_count = (self.pre_paginate_count,)
                 self.cache_set(self.results, paginated=True)
                 self.cache_set(self.pre_paginate_count, paginated=False)
-                self.pos += size
                 if self.count:
                     return self.pre_paginate_count
                 else:
@@ -156,8 +157,6 @@ class Cursor(object):
 
     def cache_key(self, func, paginated=False):
         query = self.query.copy()
-        if not paginated:
-            query['limit'] = query['offset'] = 0
         params = tuple(sorted(query.items()))
         query = tuple(sorted(query.items()))
         cache_string = str(query) + str(params) + self.func.__name__

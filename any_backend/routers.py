@@ -7,21 +7,21 @@ class BackendRouter(object):
     """
     def db_for_read(self, model, **hints):
         """
-        Attempts to read models with no_db_backend attribute go to the correct nodb_backend
+        Attempts to read models with no_db attribute go to the correct nodb_backend
         """
-        return get_db_for_model(model)
+        return getattr(model, 'non_db', None)
 
     def db_for_write(self, model, **hints):
         """
-        Attempts to write models with no_db_backend attribute go to the correct nodb_backend
+        Attempts to write models with non_db attribute go to the correct nodb_backend
         """
-        return get_db_for_model(model)
+        return getattr(model, 'non_db', None)
 
     def allow_relation(self, obj1, obj2, **hints):
         """
         Allow relations if a models with no_db_backend in class Meta is involved.
         """
-        if get_db_for_model(obj1) and get_db_for_model(obj2):
+        if getattr(obj1, 'non_db', None) and  getattr(obj2, 'non_db', None):
            return True
         return None
 

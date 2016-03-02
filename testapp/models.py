@@ -5,6 +5,9 @@ class Country(models.Model):
     alpha2 = models.CharField(max_length=2, primary_key=True)
     numeric = models.IntegerField()
 
+    non_db = 'pickle_db'
+    max_per_request = None
+
     def __str__(self):
         return self.name
 
@@ -13,6 +16,9 @@ class Subdivision(models.Model):
     name = models.CharField(max_length=50)
     type = models.CharField(max_length=10)
     country = models.ForeignKey(Country)
+
+    non_db = 'pickle_db'
+    max_per_request = 100
 
     def __str__(self):
         return self.name

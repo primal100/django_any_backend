@@ -1,9 +1,18 @@
 from django.conf import settings
 from importlib import import_module
+from django.contrib.contenttypes.models import ContentType
 
 def get_db_by_name(name):
     db = settings.DATABASES[name]
     return db
+
+def get_models_for_db(db_alias):
+    models = []
+    for type in ContentType.objects.all():
+        model = type.model_class()
+        if getattr(model, 'non_db', None) == db_alias:
+            models.append(model)
+    return models
 
 def get_compiler_by_db_name(name):
     db = get_db_by_name(name)

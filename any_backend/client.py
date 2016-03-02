@@ -1,23 +1,21 @@
 from utils import getvalue
 
 class Client(object):
-    def __init__(self, cursor, db_config):
+    def __init__(self, cursor, db_config, models):
         self.cursor = cursor
         self.db_config = db_config
+        self.models = models
 
-    def create_test(self, db_name):
-        """
-        Run when manage.py tests is run
-        """
+    def create_db(self, db_name):
         pass
 
-    def delete_test(self, db_name):
-        """
-        Run when manage.py tests is run if test nondb-backend cannot be created
-        """
+    def delete_db(self, db_name):
         pass
 
-    def setup(self, db_config):
+    def db_exists(self, db_name):
+        return True
+
+    def setup(self, db_name):
         """
         Run when Django app is started
         """
@@ -128,9 +126,6 @@ class Client(object):
                 return list_of_tuples
         else:
             return []
-
-    def check_if_exists(self, filters):
-        pass
 
     def enter(self):
         pass

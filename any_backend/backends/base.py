@@ -8,6 +8,7 @@ from django.utils.module_loading import import_string
 from operations import DatabaseOperations
 from importlib import import_module
 from cursor import Cursor
+from any_backend.utils import get_models_for_db
 
 class DatabaseWrapper(BaseDatabaseWrapper):
     Database = Database
@@ -43,7 +44,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.introspection = DatabaseIntrospection(self)
         client_class = self.db_config['CLIENT']
         client_class = import_string(client_class)
-        self.client = client_class(self.create_cursor(), self.db_config)
+        models = get_models_for_db(self.alias)
+        self.db_name = self.db_config['NAME']
+        self.client = client_class(self.create_cursor(), self.db_config, models)
 
     def create_cursor(self):
         return Cursor()
@@ -52,7 +55,9 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return{'connection': self.db_config}
 
     def get_new_connection(self, conn_params):
-        self.client.setup(self.db_config)
+        if not self.client.db_exists(self.db_name):
+            self.client.create_db(self.db_name)
+        self.client.setup(self.db_name)
         return self.client
 
     def is_usable(self):

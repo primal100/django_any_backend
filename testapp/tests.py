@@ -1,97 +1,79 @@
-from django.test import TestCase
-from django.db.models import ObjectDoesNotExist
+from any_backend.testcases import CompareWithSQLTestCase
 from models import Country, Subdivision
-from django.conf import settings
-import os
-from any_backend.utils import make_dict_from_obj, toDicts
+from sql_testapp.models import Country as SQLCountry, Subdivision as SQLSubdivision
 import pycountry
 
-class PickleTest(TestCase):
+class PickleTest(CompareWithSQLTestCase):
 
     def setUp(self):
-        country_codes = []
-        for country in list(pycountry.countries)[0:30]:
-            model = Country(name=country.name, alpha2=country.alpha2, numeric=country.numeric)
-            model.save()
-            country_codes.append(country.alpha2)
-        for subdivision in list(pycountry.subdivisions)[0:600]:
-            if subdivision.country_code in country_codes:
-                country = Country.objects.get(alpha2=subdivision.country_code)
-                model = Subdivision(name=subdivision.name, code=subdivision.code, country=country, type=subdivision.type)
-                model.save()
+        self.models = ((SQLCountry, SQLSubdivision), (Country, Subdivision))
+        for models in self.models:
+            country_model = models[0]
+            if len(country_model.objects.all()) == 0:
+                country_instances = []
+                for country in list(pycountry.countries)[0:30]:
+                    instance = country_model(name=country.name, alpha2=country.alpha2, numeric=country.numeric)
+                    country_instances.append(instance)
+                country_model.objects.bulk_create(country_instances)
+                subdivision_model = models[1]
+                subdivision_instances = []
+                for subdivision in list(pycountry.subdivisions):
+                    if any(subdivision.country_code == x.alpha2 for x in country_instances):
+                        country = country_model.objects.filter(alpha2=subdivision.country_code).get()
+                        instance = subdivision_model(name=subdivision.name, code=subdivision.code, country=country, type=subdivision.type)
+                        subdivision_instances.append(instance)
+                subdivision_model.objects.bulk_create(subdivision_instances)
 
-    def test_all(self):
-        equalto = ''
-        self.assertEqual('', equalto)
+    def with_cache(self, func, *args, **kwargs):
+        func(*args, **kwargs)
+        with self._overridden_settings():
+            func(*args, **kwargs)
+            
+    def test_countries_all(self):
+        sql_queryset = SQLCountry.objects.all().order_by('alpha2')
+        nondb_queryset = Country.objects.all().order_by('alpha2')
+        self.breakdown_queryset(nondb_queryset)
+        self.assertQuerysetsEqual(sql_queryset, nondb_queryset)
 
-    """def test_get(self):
-        equalto = ''
-        self.assertEqual(make_dict_from_obj(Country.objects.get(id=1)), equalto)
-
-    def test_first(self):
-        equalto = ''
-        self.assertEqual(make_dict_from_obj(Country.objects.all().order_by('name').first()), equalto)
-
-    def test_last(self):
-        equalto = ''
-        self.assertEqual(make_dict_from_obj(Country.objects.filter(continent='Europe').order_by('id').last()), equalto)
-
-    def test_filter(self):
-        equalto = ''
-        self.assertEqual(toDicts(Country.objects.filter(continent='Africa', language='Asia')), equalto)
-
-    def test_ordering(self):
-        equalto = ''
-        self.assertEqual(toDicts(Country.objects.all().order_by('-continent', 'language', 'name')), equalto)
-
-    def test_distinct(self):
-        equalto = ''
-        self.assertEqual(toDicts(Country.objects.all().distinct('continent', 'language')), equalto)
-
-    def test_pagination(self):
-        equalto = ''
-        self.assertEqual(toDicts(Country.objects.all().order_by('-name'))[5:10], equalto)
+    def test_subdivisions_all(self):
+        sql_queryset = SQLSubdivision.objects.all().order_by('code')
+        nondb_queryset = Subdivision.objects.all().order_by('code')
+        self.breakdown_queryset(nondb_queryset)
+        self.assertQuerysetsEqual(sql_queryset, nondb_queryset)
 
     def test_count(self):
-        equalto = len(countries)
-        self.assertEqual(toDicts(Country.objects.all().count()), equalto)
+        self.assertEqual(self.count_with_time(SQLCountry.objects.all()), 30)
+        self.assertEqual(self.count_with_time(Country.objects.all()), 30)
 
-    def test_count_with_filter(self):
-        equalto = 2
-        self.assertEqual(toDicts(Country.objects.filter(continent=2)), equalto)
+    def test_get(self):
+        sql_result = self.get_with_time(SQLSubdivision.objects.filter(name='Armavir'))
+        nondb_result = self.get_with_time(Subdivision.objects.filter(name='Armavir'))
+        self.assertEqual(str(sql_result), str(nondb_result))
 
-    def test_create(self):
-        equalto = ''
-        kwargs = dict(name='USA', continent='North America', capital='Washington',
-                                   language='English')
-        self.assertRaises(
-            Country.objects.filter(**kwargs).get(), ObjectDoesNotExist)
-        usa = Country(**kwargs)
-        equalto = ''
-        self.assertEqual(usa.save(), equalto)
-        equalto = ''
-        self.assertEqual(make_dict_from_obj(
-            Country.objects.filter(**kwargs).get()), equalto)
+    def test_last(self):
+        sql_result = self.last_with_time(SQLSubdivision.objects.filter(code='AU').order_by('code'))
+        nondb_result = self.last_with_time(Subdivision.objects.filter(code='AU').order_by('code'))
+        self.assertQuerysetsEqual(sql_result, nondb_result)
 
-    def test_update(self):
-        equalto = ''
-        filter1 = dict(name='Ireland')
-        filter2 = dict(name='Scotland')
-        self.assertRaises(
-            Country.objects.filter(**filter2).get(), ObjectDoesNotExist)
-        scotland =  Country.objects.filter(**filter1)
-        scotland.name = 'Scotland'
-        equalto = ''
-        self.assertEqual(scotland.save(), equalto)
-        equalto = ''
-        self.assertEqual(make_dict_from_obj(Country.objects.filter(**filter2).get()), equalto)
+    def test_first(self):
+        sql_result = self.first_with_time(SQLSubdivision.objects.filter(type='parish').order_by('code'))
+        nondb_result = self.first_with_time(Subdivision.objects.filter(type='parish').order_by('code'))
+        self.assertQuerysetsEqual(sql_result, nondb_result)
 
-    def test_delete(self):
-        equalto = ''
-        filter = dict(continent='Asia')
-        self.assertEqual(make_dict_from_obj(
-            Country.objects.filter(**filter)), equalto)
-        equalto = ''
-        self.assertEqual(Country.objects.filter(**filter).delete(), equalto)
-        self.assertRaises(make_dict_from_obj(
-        Country.objects.filter(**filter).get()), ObjectDoesNotExist)"""
+    def test_save(self):
+        pass
+
+    def test_delete_county(self):
+        sql_result = self.first_with_time(SQLCountry.objects.filter(name='Ireland'))
+        nondb_result = self.first_with_time(Country.objects.filter(name='Ireland'))
+        self.assertQuerysetsEqual(sql_result, nondb_result)
+        nondb_qs = Country.objects.filter(name='Ireland')
+        self.assertRaises(Country.DoesNotExist, nondb_qs.get)
+
+    @with_cache
+    def test_delete_subdivision(self):
+        sql_result = self.first_with_time(SQLSubdivision.objects.filter(type='parish'))
+        nondb_result = self.first_with_time(Subdivision.objects.filter(type='parish'))
+        self.assertQuerysetsEqual(sql_result, nondb_result)
+        nondb_qs = Subdivision.objects.filter(type='parish')
+        self.assertRaises(Subdivision.DoesNotExist, nondb_qs.get)

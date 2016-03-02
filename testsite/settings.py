@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'any_backend',
+    'sql_testapp',
     'testapp'
 ]
 
@@ -85,7 +86,6 @@ DATABASES = {
         'ENGINE': 'any_backend.backends',
         'NAME': os.path.join(BASE_DIR, 'db.pickle'),
         'CLIENT': 'pickle_db.client.PickleDB',
-        'MODELS': ['testapp_country', 'testapp_subdivision'],
         'TEST': {
             'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
         }
@@ -93,6 +93,13 @@ DATABASES = {
 }
 
 DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
+
+CACHES = {
+    'pickle_cache': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/1.9/ref/settings/#auth-password-validators

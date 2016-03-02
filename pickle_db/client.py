@@ -2,32 +2,44 @@ import pickle
 import os
 from operator import itemgetter
 from any_backend.client import Client
+from django.core.cache import caches
 
 class PickleDB(Client):
 
-    def create_test(self, db_name):
+    def create_db(self, db_name):
+        self.cache = caches['pickle_cache']
         self.filename = db_name
-        self.initialize()
+        self._update_data(new=True)
 
-    def delete_test(self, db_name):
+    def delete_db(self, db_name):
         os.remove(db_name)
 
-    def setup(self, db_config):
-        self.db_config = db_config
-        self.filename = getattr(self, 'filename', self.db_config['NAME']) or self.db_config['TEST']['NAME']
-        self.initialize()
+    def db_exists(self, db_name):
+        self.filename = db_name
+        return os.path.exists(self.filename)
 
-    def initialize(self):
-        self.models = self.db_config['MODELS']
-        if not os.path.exists(self.filename):
-            self._update_data(new=True)
+    def setup(self, db_name):
+        self.filename = db_name
+        self.cache = caches['pickle_cache']
 
     def _get_data(self, model=None):
-        with open(self.filename, 'rb') as handle:
-            self.data = pickle.load(handle)
         if model:
-            return self.data[model._meta.db_table]
-        return self.data
+            data = self.cache.get(model._meta.model_name, default=None)
+            if not data:
+                data = self.cache.get('all', default=None)
+                if data:
+                    data = data[model._meta.db_table]
+                    self.cache.set(model._meta.model_name, data, 15)
+        else:
+            data = self.cache.get('all', default=None)
+        if not data:
+            with open(self.filename, 'rb') as handle:
+                data = pickle.load(handle)
+                self.cache.set('all', data, 15)
+            if model:
+                data = data[model._meta.db_table]
+                self.cache.set(model._meta.model_name, data, 15)
+        return data
 
     def _update_data(self, model=None, new_data=None, new=False):
         if not new:
@@ -37,11 +49,12 @@ class PickleDB(Client):
         elif new:
             self.data = {}
             for model in self.models:
-                self.data[model.lower()] = []
+                self.data[model._meta.db_table] = []
         else:
             raise TypeError('Update pickle file failed. Model and new arguments cannot both be None')
         with open(self.filename, 'wb') as handle:
             pickle.dump(self.data, handle)
+        self.cache.clear()
 
     def create_bulk(self, model, objects):
         model_list = self._get_data(model=model)
@@ -66,6 +79,8 @@ class PickleDB(Client):
 
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
+        if model._meta.model_name.lower() == 'subdivision':
+            pass
         objects = self._get_data(model=model)
         objects, count = self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
         for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
