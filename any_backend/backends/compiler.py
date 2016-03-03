@@ -50,6 +50,7 @@ class SQLCompiler(compiler.SQLCompiler):
                     result['count'] = True
                 else:
                     result['func'] = self.connection.client.get_pks
+                    result['is_get_pks'] = True
                     result['immediate_execute'] = True
                     break
 

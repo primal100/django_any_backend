@@ -63,5 +63,7 @@ class BackendPaginator(object):
         else:
             return objects
 
-    def as_dict(self):
-        return {'low': self.low_mark, 'high': self.high_mark}
+    def to_dict(self):
+        if self.paginated:
+            return {'low': self.low_mark, 'high': self.high_mark}
+        return {}

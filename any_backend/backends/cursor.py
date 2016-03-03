@@ -31,11 +31,12 @@ class Cursor(object):
             db_config = query.pop('db_config')
             self.max_relation_depth = db_config.get('MAX_RELATION_DEPTH', 10)
             self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or db_config.get('CHUNK_SIZE', None)
-            cache_name = db_config.get('CACHE_NAME', None)
-            if cache_name:
+            cache = db_config.get('CACHE', None)
+            if cache:
+                cache_name = cache['NAME']
                 self.cache = caches[cache_name]
-                self.cache_timeout = db_config.get('CACHE_TIMEOUT', 60)
-                self.cache_count_all_timeout = db_config.get('CACHE_COUNT_ALL_TIMEOUT', self.cache_timeout)
+                self.cache_timeout = cache.get('TIMEOUT', 60)
+                self.cache_count_all_timeout = cache.get('COUNT_ALL_TIMEOUT', self.cache_timeout)
             else:
                 self.cache = None
             self.query = query
@@ -45,7 +46,8 @@ class Cursor(object):
                 if self.model._meta.db_table == 'django_migrations':
                     self.results = []
                 else:
-                    self.count = False
+                    if 'is_get_pks' in self.query.keys():
+                        self.query = {}
                     self.results = self.func(self.model, self.params, **self.query)
                     self.results = self.conversion_func(self.results, self.fieldnames)
                     if self.cache:
@@ -100,9 +102,12 @@ class Cursor(object):
                 return self.pre_paginate_count
         else:
             self.results = self.func(self.model, self.params, **self.query)
-        result = [self.results[self.pos]]
+        if self.results:
+            result = self.conversion_func(self.results, self.fieldnames)[self.pos]
+        else:
+            result = []
         self.pos += 1
-        return self.conversion_func(result, self.fieldnames)[0]
+        return result
 
     def fetchmany(self, size=0):
         if self.immediate_execute:
@@ -115,8 +120,8 @@ class Cursor(object):
             if not self.full_request_size or self.pos <= self.full_request_size:
                 self.query['paginator'].update(self.pos, self.size)
                 if self.cache:
-                    self.results = self.cache.get(default=[], paginated=True)
-                    self.pre_paginate_count = self.cache.get(default=(), paginated=False)
+                    self.results = self.cache_get(default=[])
+                    self.pre_paginate_count = self.cache_get(default=())
                     if self.results:
                         return self.results
                 self.results, self.pre_paginate_count = self.func(self.model, self.params, **self.query)
@@ -127,8 +132,8 @@ class Cursor(object):
                 else:
                     self.pos += self.pre_paginate_count + 1
                 self.pre_paginate_count = (self.pre_paginate_count,)
-                self.cache_set(self.results, paginated=True)
-                self.cache_set(self.pre_paginate_count, paginated=False)
+                self.cache_set(self.results)
+                self.cache_set(self.pre_paginate_count)
                 if self.count:
                     return self.pre_paginate_count
                 else:
@@ -140,13 +145,13 @@ class Cursor(object):
     def fetchall(self):
         return list(self.fetchmany())
 
-    def cache_get(self, default=None, paginated=False):
+    def cache_get(self, default=None):
         if self.cache:
-            string = self.cache_get(self.func, paginated=paginated)
+            string = self.cache_key(self.func)
             return self.cache.get(string, default=default)
         return None
 
-    def cache_set(self, value, paginated=False):
+    def cache_set(self, value):
         if self.cache:
             if self.count and not self.params:
                 timeout = self.cache_count_all_timeout
@@ -155,11 +160,37 @@ class Cursor(object):
             string = self.cache_key(self.func)
             self.cache.set(string, value, timeout)
 
-    def cache_key(self, func, paginated=False):
-        query = self.query.copy()
-        params = tuple(sorted(query.items()))
-        query = tuple(sorted(query.items()))
-        cache_string = str(query) + str(params) + self.func.__name__
+    @staticmethod
+    def list_to_string(key, newlist):
+        newlist = sorted(newlist)
+        string = key + ':'
+        for l in newlist:
+            string += str(l) + '-'
+        return string
+
+    def dict_to_string(self, key, dictionary):
+        newlist = []
+        for k, v in dictionary.iteritems():
+            newlist.append(str(k) + ':' + str(v))
+        string = self.list_to_string(key, newlist)
+        return string
+
+    def cache_key(self, func):
+        model_name = self.model._meta.model_name
+        params = self.dict_to_string('params', self.params.to_dict())
+        distinct = self.list_to_string('distinct', self.query['distinct'])
+        out_cols = self.list_to_string('fieldnames', self.fieldnames)
+        if 'paginator' in self.query:
+            paginator = sorted(self.query['paginator'].to_dict())
+        else:
+            paginator = {}
+        paginator = self.list_to_string('paginator', paginator)
+        if 'order_by' in self.query:
+            order_by = sorted(self.query['order_by'])
+        else:
+            order_by = {}
+        order_by = self.list_to_string('order_by', paginator)
+        cache_string = model_name + params + distinct + out_cols + paginator + self.func.__name__
         return cache_string
 
     def start(self):

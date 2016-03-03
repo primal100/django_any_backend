@@ -88,6 +88,10 @@ DATABASES = {
         'CLIENT': 'pickle_db.client.PickleDB',
         'TEST': {
             'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
+        },
+        'CACHE': {
+            'NAME': 'default',
+            'TIMEOUT': 0,
         }
     }
 }
@@ -95,9 +99,13 @@ DATABASES = {
 DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
 
 CACHES = {
+    'default':{
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'default-cache'
+    },
     'pickle_cache': {
         'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
+        'LOCATION': 'unique-pickle',
     }
 }
 

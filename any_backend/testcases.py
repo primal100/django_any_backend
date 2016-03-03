@@ -6,24 +6,28 @@ import six
 import time
 
 class CompareWithSQLTestCase(TestCase):
+    print_times = True
+
 
     def assertQuerysetsEqual(self, qs1, qs2, transform=repr, ordered=True, msg=None):
-        if not qs1 or not qs2:
-            self.assertEqual(qs1, qs2, msg=msg)
-        else:
-            qs1_items = self.qs_to_list_with_time(transform, qs1)
-            qs2_items = self.qs_to_list_with_time(transform, qs2)
-            if not ordered:
-                return self.assertEqual(Counter(qs1_items), Counter(qs2_items), msg=msg)
-            qs1_values = list(qs1_items)
-            qs2_values = list(qs2_items)
-            self.assertEqual(qs1_values, qs2_values, msg=msg)
+        qs1_items = self.qs_to_list_with_time(transform, qs1)
+        qs2_items = self.qs_to_list_with_time(transform, qs2)
+        if not ordered:
+            return self.assertEqual(Counter(qs1_items), Counter(qs2_items), msg=msg)
+        qs1_values = list(qs1_items)
+        qs2_values = list(qs2_items)
+        self.assertEqual(qs1_values, qs2_values, msg=msg)
 
-    def run_with_time(self, qs, string, func, *args, **kwargs):
+    def prop_with_time(self, model_table, string, obj, attr):
+        result = self.run_with_time(model_table, string, getattr, obj, attr)
+        return result
+
+    def run_with_time(self, model_table, string, func, *args, **kwargs):
         startTime = time.time()
         result = func(*args, **kwargs)
         t = time.time() - startTime
-        print "%s %s %s: %.3f secs" % (self.id(), qs.model._meta.db_table, string, t)
+        if self.print_times:
+            print "%s %s %s: %.3f secs" % (self.id(), model_table, string, t)
         return result
 
     def save_with_time(self, model):
@@ -34,45 +38,45 @@ class CompareWithSQLTestCase(TestCase):
         return result
 
     def qs_to_list_with_time(self, transform, qs):
-        qs_items = self.run_with_time(qs, 'list', six.moves.map, transform, qs)
+        qs_items = self.run_with_time(qs.model._meta.db_table, 'list', six.moves.map, transform, qs)
         return qs_items
 
     def get_with_time(self, qs):
-        result = self.run_with_time(qs, 'get', qs.get)
+        result = self.run_with_time(qs.model._meta.db_table, 'get', qs.get)
         return result
 
     def count_with_time(self, qs):
-        result = self.run_with_time(qs, 'count', qs.count)
+        result = self.run_with_time(qs.model._meta.db_table, 'count', qs.count)
         return result
 
     def first_with_time(self, qs):
-        result = self.run_with_time(qs, 'first', qs.first)
+        result = self.run_with_time(qs.model._meta.db_table, 'first', qs.first)
         return result
 
     def last_with_time(self, qs):
-        result = self.run_with_time(qs, 'last', qs.last)
+        result = self.run_with_time(qs.model._meta.db_table, 'last', qs.last)
         return result
 
     def delete_with_time(self, qs):
-        result = self.run_with_time(qs, 'delete', qs.delete)
+        result = self.run_with_time(qs.model._meta.db_table, 'delete', qs.delete)
         return result
 
     def breakdown_queryset(self, queryset):
         db = queryset.db
         compiler = queryset.query.get_compiler(using=db)
-        sql, params = self.run_with_time(queryset, 'compiler.as_sql', compiler.as_sql)
+        sql, params = self.run_with_time(queryset.model._meta.db_table, 'compiler.as_sql', compiler.as_sql)
         cursor = compiler.connection.cursor()
-        self.run_with_time(queryset, 'cursor.execute', cursor.execute, sql, params)
+        self.run_with_time(queryset.model._meta.db_table, 'cursor.execute', cursor.execute, sql, params)
         results = []
         cursor = cursor.cursor
         cursor.results = None
         while cursor.results != []:
             if not cursor.full_request_size or cursor.pos <= cursor.full_request_size:
                 cursor.query['paginator'].update(cursor.pos, cursor.size)
-                cursor.results, cursor.pre_paginate_count = self.run_with_time(queryset, 'get_results', cursor.func,
+                cursor.results, cursor.pre_paginate_count = self.run_with_time(queryset.model._meta.db_table, 'get_results', cursor.func,
                                                                                cursor.model, cursor.params,
                                                                                **cursor.query)
-                cursor.results = self.run_with_time(queryset, 'cursor.conversion_func', cursor.conversion_func, cursor.results, cursor.fieldnames)
+                cursor.results = self.run_with_time(queryset.model._meta.db_table, 'cursor.conversion_func', cursor.conversion_func, cursor.results, cursor.fieldnames)
                 cursor.full_request_size = cursor.page_size if cursor.paginated else cursor.pre_paginate_count
                 if cursor.size:
                     cursor.pos += cursor.size

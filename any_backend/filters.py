@@ -6,7 +6,7 @@ class Filters(list):
             objects = filter.apply(objects)
         return objects
 
-    def as_dict(self):
+    def to_dict(self):
         dictionary = {}
         for filter in self:
             if filter.operator == 'exact':

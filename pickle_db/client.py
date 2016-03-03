@@ -79,8 +79,6 @@ class PickleDB(Client):
 
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
-        if model._meta.model_name.lower() == 'subdivision':
-            pass
         objects = self._get_data(model=model)
         objects, count = self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
         for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
