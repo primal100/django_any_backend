@@ -10,7 +10,7 @@ class SubdivisionAdmin(TabularInline):
     fields = ('name', 'code', 'country', 'type')
 
 class CountryAdmin(CustomMA):
-    list_display = ('name', 'alpha2', 'numeric')
+    list_display = ('name', 'alpha2')
     inlines = (SubdivisionAdmin, )
     list_max_show_all = True
     list_per_page = 3

@@ -9,8 +9,13 @@ class OrderBy(object):
     def apply(self, objects):
         return sorted(objects, key=lambda k: getvalue(k, self.field_name), reverse=self.reverse)
 
-
 class OrderingList(list):
+
+    def __repr__(self):
+        string = 'Ordering='
+        for column in self:
+            string += column + ';'
+        return string
 
     def apply(self, objects,  exclude_columns=()):
         for column in exclude_columns:

@@ -1,10 +1,17 @@
 from utils import getvalue
+import operator
 
 class Filters(list):
     def apply(self, objects):
         for filter in self:
             objects = filter.apply(objects)
         return objects
+
+    def __repr__(self):
+        string = 'Filters='
+        for item in sorted(self, key=operator.itemgetter('field_name')):
+            string += str(item)
+        return string
 
     def to_dict(self):
         dictionary = {}
@@ -22,6 +29,9 @@ class Filter(object):
         self.field_type = field.get_internal_type()
         self.operator = operator
         self.value = value
+
+    def __repr__(self):
+        return 'Filter=' + self.field_name + ';' + self.operator + ';' + str(self.value) + ';'
 
     def get(self, obj, sensitive):
 

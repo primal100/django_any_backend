@@ -29,18 +29,18 @@ class Client(object):
         :return: object The object which was successfully created
         """
 
-        raise NotImplementedError('You must implement a create function in your connection class')
+        raise NotImplementedError('You must implement a create func in your connection class')
 
 
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
-        raise NotImplementedError('You have not implemented a list function in your connection class')
+        raise NotImplementedError('You have not implemented a list func in your connection class')
 
     def delete(self, model, id):
-        raise NotImplementedError('You have not implemented a delete function in your connection class')
+        raise NotImplementedError('You have not implemented a delete func in your connection class')
 
     def update(self, model, id, update_with):
-        raise NotImplementedError('You have not implemented an update function in your connection class')
+        raise NotImplementedError('You have not implemented an update func in your connection class')
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None):
         if filters:
@@ -55,7 +55,7 @@ class Client(object):
         return objects, count
 
     def get_pks(self, model, filters):
-        raise NotImplementedError("You have not implemented a get_pks function")
+        raise NotImplementedError("You have not implemented a get_pks func")
 
     def create_bulk(self, model, objects):
         created_objects = []

@@ -11,46 +11,43 @@ class APIPaginator(Paginator):
         page_num = page_num
         if not page_num and request:
             page_num = int(request.GET.get(PAGE_VAR, 0))
-        self.this_page = self.page(page_num + 1)
+        bottom = (page_num) * self.per_page
+        top = bottom + self.per_page
+        self.page_object_list = list(self.object_list[bottom:top])
 
-    def _get_count(self):
+    def page(self, number):
         """
-        Returns the total number of objects, across all pages.
+        Returns a Page object for the given 1-based page number.
         """
-        if self._count is None:
-            try:
-                #self.this_page = self.page(self.page_num)
-                self._count = self.object_list.count()
-            except (AttributeError, TypeError):
-                # AttributeError if object_list has no count() method.
-                # TypeError if object_list.count() requires arguments
-                # (i.e. is of type list). Will return the length of requested page only.
-                self._count = len(self.object_list)
-        return self._count
-    count = property(_get_count)
+        number = self.validate_number(number)
+        bottom = (number - 1) * self.per_page
+        top = bottom + self.per_page
+        if top + self.orphans >= self.count:
+            top = self.count
+        return self._get_page(self.page_object_list, number, self)
 
 class BackendPaginator(object):
     def __init__(self, with_limits, low_mark, high_mark, no_limit_value):
         self.paginated = with_limits
-        if not low_mark and not high_mark:
-            self.paginated = False
-        if self.paginated:
-            self.paginate(low_mark, high_mark, no_limit_value)
-
-    def paginate(self, low_mark, high_mark, no_limit_value):
         self.low_mark = low_mark or 0
         self.high_mark = high_mark
         if not self.high_mark:
                 self.high_mark = no_limit_value
+        if not self.low_mark and not self.high_mark:
+            self.paginated = False
+        if self.paginated:
+            self.paginate()
+
+    def paginate(self):
         self.page_size = self.high_mark - self.low_mark + 1
         self.page_num = ceil(self.low_mark / self.page_size) + 1
 
     def update(self, pos, size):
         if size:
-            low_mark = self.low_mark =+ pos
-            high_mark = low_mark + size - 1
+            self.low_mark = self.low_mark =+ pos
+            self.high_mark = self.low_mark + size - 1
             self.paginated = True
-            self.paginate(low_mark, high_mark, None)
+            self.paginate()
 
     def apply(self, objects):
         if self.paginated:
@@ -62,6 +59,9 @@ class BackendPaginator(object):
                 return []
         else:
             return objects
+
+    def __repr__(self):
+        return 'BackendPaginator=' + str(self.low_mark) + '-' + str(self.high_mark)
 
     def to_dict(self):
         if self.paginated:
