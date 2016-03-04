@@ -1,10 +1,17 @@
 from django.db.models.sql import compiler
+from django.db.models.sql.constants import (
+    MULTI, NO_RESULTS, SINGLE, CURSOR
+)
 from django.core.exceptions import FieldError
 from any_backend.paginators import BackendPaginator
 from any_backend.filters import Filters, Filter
 from any_backend.sorting import OrderBy, OrderingList
+from django.core.cache import caches
 from any_backend.distinct import DistinctFields
 from any_backend.update import UpdateParams
+import logging
+
+logger = logging.getLogger('django')
 
 def make_dicts(connection, query, immediate_execute):
     result = {
@@ -30,58 +37,146 @@ class SQLCompiler(compiler.SQLCompiler):
                 filters.append(filter_obj)
         return filters
 
-    def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
-        result, params = make_dicts(self.connection, self.query, False)
-        result['func'] = self.connection.client.list
-        self.subquery = subquery
-        refcounts_before = self.query.alias_refcount.copy()
-        try:
-            #extra_select, order_by, group_by = self.pre_sql_setup()
+    def setup_attributes(self):
+        self.model = self.query.model
+        self.pk_fieldname = self.model._meta.pk.attname
+        self.fieldnames = [(self.pk_fieldname,)]
+        self.db_config = self.connection.settings_dict
+        self.max_relation_depth = self.db_config.get('MAX_RELATION_DEPTH', 10)
 
-            self.setup_query()
+    def setup_read_query(self):
+        self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or self.db_config.get('CHUNK_SIZE', None)
+        cache = self.db_config.get('CACHE', None)
+        if cache:
+            cache_name = cache['NAME']
+            self.cache = caches[cache_name]
+            self.cache_timeout = cache.get('TIMEOUT', 60)
+            self.cache_count_all_timeout = cache.get('COUNT_ALL_TIMEOUT', self.cache_timeout)
+        else:
+            self.cache = None
 
-            result['count'] = False
-            out_cols = []
-            for column in self.select:
-                field = column[0]._output_field
-                if hasattr(field, 'column'):
-                    out_cols.append(field)
-                elif 'count' in str(column):
-                    result['count'] = True
+    def get_related(self, field, field_model):
+        field_tuple = [field_model._meta.model_name]
+        for relation in field_model._meta._relation_tree:
+            if relation.model == self.model:
+                field_tuple.append(field.column)
+                return field_tuple
+            else:
+                field_tuple.insert(0, field_model._meta.model_name)
+                field_tuple += self.get_related(field, relation.model)
+                return field_tuple
+
+    def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False, count=False):
+        result, params = {}, {}
+
+        self.setup_query()
+
+        filters = self.compile(self.query.where) if self.query.where is not None else ([])
+
+        distinct = DistinctFields()
+        distinct += self.get_distinct()
+        result['distinct'] = distinct
+
+        if not count:
+
+            result['out_cols'] = self.fields
+
+            ordering = OrderingList()
+            pk_attname = self.query.model._meta.pk.attname
+            for i, order_by in enumerate(self.query.order_by):
+                if order_by == 'pk':
+                    self.query.order_by[i] = pk_attname
+                elif order_by == '-pk':
+                    self.query.order_by[i] = '-' + pk_attname
+            ordering += self.query.order_by
+            result['order_by'] = ordering
+
+            result['paginator'] = BackendPaginator(with_limits, self.query.low_mark, self.query.high_mark,
+                                                   self.connection.ops.no_limit_value())
+
+        return result, filters
+
+    def execute_sql(self, result_type=MULTI):
+        if not result_type:
+            result_type = NO_RESULTS
+
+        self.setup_attributes()
+
+        if self.model._meta.db_table == 'django_migrations':
+            return []
+
+        self.setup_read_query()
+
+        count = False
+        self.fields = []
+        for column in self.select:
+            field = column[0]._output_field
+            if hasattr(field, 'column'):
+               self.fields.append(field)
+            elif 'count' in str(column):
+                count = True
+
+        query, params = self.as_sql(count=count)
+
+        if count:
+            with self.connection.client as client:
+                results = (client.count(self.model, params, **query),)
+        else:
+            self.column_names = 'column_names='
+            fieldnames = []
+            for field in self.fields:
+                field_model = field.model
+                if field_model == self.model:
+                    field_tuple = (field.column,)
                 else:
-                    result['func'] = self.connection.client.get_pks
-                    result['is_get_pks'] = True
-                    result['immediate_execute'] = True
-                    break
+                    field_tuple = tuple(self.get_related(field, field_model))
+                self.column_names += field.column + ';'
+                fieldnames.append(field_tuple)
+            if result_type == SINGLE:
+                paginated = True
+                page_size = 1
+                self.chunk_size = 1
+                query['paginator'].update(0, page_size)
+            else:
+                paginated = query['paginator'].paginated
+                if paginated:
+                    page_size = query['paginator'].page_size
+                else:
+                    page_size = float('inf')
+            full_results = []
+            results = None
+            pre_paginate_count = 0
+            pos = 0
+            while results != []:
+                remaining = page_size - pos
+                if self.chunk_size < remaining:
+                    query['paginator'].update(pos, self.chunk_size)
+                else:
+                    query['paginator'].update(pos, remaining)
+                with self.connection.client as client:
+                    results, pre_paginate_count = client.list(self.model, params, **query)
+                    results = self.connection.client.convert_to_tuples(results, fieldnames)
+                full_results += results
+                if page_size == float('inf'):
+                    page_size = pre_paginate_count
+                pos += self.chunk_size
+                if len(results) < self.chunk_size or self.chunk_size == page_size or pos > page_size or len(
+                        full_results) >= page_size:
+                    results = []
 
-            filters = self.compile(self.query.where) if self.query.where is not None else ([])
 
-            if result['func'] != self.connection.client.get_pks:
+            pre_paginate_count = (pre_paginate_count,)
 
-                result['out_cols'] = out_cols
+        if result_type == SINGLE:
+            return results[0]
 
-                distinct = DistinctFields()
-                distinct += self.get_distinct()
-                result['distinct'] = distinct
+        if result_type == CURSOR:
+            return self.connection.client
 
-                ordering = OrderingList()
-                pk_attname = self.query.model._meta.pk.attname
-                for i, order_by in enumerate(self.query.order_by):
-                    if order_by == 'pk':
-                        self.query.order_by[i] = pk_attname
-                    elif order_by == '-pk':
-                        self.query.order_by[i] = '-' + pk_attname
-                ordering += self.query.order_by
-                result['order_by'] = ordering
+        if result_type == NO_RESULTS:
+            return
 
-                result['paginator'] = BackendPaginator(with_limits, self.query.low_mark, self.query.high_mark,
-                                                       self.connection.ops.no_limit_value())
-
-            return result, filters
-        finally:
-            # Finally do cleanup - get rid of the joins we created above.
-            self.query.reset_refcounts(refcounts_before)
-
+        return results
 
 class SQLInsertCompiler(compiler.SQLInsertCompiler):
 
@@ -146,4 +241,15 @@ class SQLAggregateCompiler(compiler.SQLAggregateCompiler):
     def as_sql(self):
         result, params = make_dicts(self.connection, self.query, True)
         result['func'] = self.connection.client.count
-        pass
+
+def cursor_iter(cursor, sentinel, col_count):
+    """
+    Yields blocks of rows from a cursor and ensures the cursor is closed when
+    done.
+    """
+    try:
+        for rows in iter((lambda: cursor.fetchmany(GET_ITERATOR_CHUNK_SIZE)),
+                         sentinel):
+            yield [r[0:col_count] for r in rows]
+    finally:
+        cursor.close()

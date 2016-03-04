@@ -127,10 +127,10 @@ class Client(object):
         else:
             return []
 
-    def enter(self):
-        pass
+    def __enter__(self):
+        return self
 
-    def close(self, exc_type=None, exc_val=None, exc_tb=None):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
     def commit(self):
