@@ -1,8 +1,7 @@
 from utils import getvalue
 
 class Client(object):
-    def __init__(self, cursor, db_config, models):
-        self.cursor = cursor
+    def __init__(self, db_config, models):
         self.db_config = db_config
         self.models = models
 
@@ -60,9 +59,9 @@ class Client(object):
     def create_bulk(self, model, objects):
         created_objects = []
         for obj in objects:
-            obj = self.create(model, object)
+            obj = self.create(model, obj)
             created_objects.append(obj)
-        return object
+        return obj
 
     def delete_bulk(self, model, filters):
         """

@@ -1,9 +1,8 @@
-from utils import backend_is_non_db, get_db_for_model
+from utils import backend_is_non_db
 
 class BackendRouter(object):
     """
-    A router to control all database operations on models in the
-    auth application.
+    A router to send all non-db models to the correct backend
     """
     def db_for_read(self, model, **hints):
         """
@@ -18,9 +17,6 @@ class BackendRouter(object):
         return getattr(model, 'non_db', None)
 
     def allow_relation(self, obj1, obj2, **hints):
-        """
-        Allow relations if a models with no_db_backend in class Meta is involved.
-        """
         if getattr(obj1, 'non_db', None) and  getattr(obj2, 'non_db', None):
            return True
         return None

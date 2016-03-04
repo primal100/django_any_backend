@@ -58,8 +58,8 @@ class PickleDB(Client):
 
     def create_bulk(self, model, objects):
         model_list = self._get_data(model=model)
+        pk_fieldname =  model._meta.pk.attname
         if model._meta.pk.auto_created:
-            pk_fieldname =  model._meta.pk.attname
             if model_list:
                 last_pk = sorted(model_list, key=itemgetter(pk_fieldname), reverse=True)[0][pk_fieldname]
             else:
@@ -70,7 +70,8 @@ class PickleDB(Client):
                 objects[i] = object
         model_list += objects
         self._update_data(model=model, new_data=model_list)
-        return objects
+        pks = [x[pk_fieldname] for x in objects]
+        return pks
 
     def get_pks(self, model, filters):
         objects = self._get_data(model=model)
@@ -95,7 +96,7 @@ class PickleDB(Client):
         for object in objects:
             data.remove(object)
         self._update_data(model=model, new_data=data)
-        return objects
+        return len(objects)
 
     def update_bulk(self, model, filters, update_with=()):
         data = self._get_data(model=model)
@@ -104,4 +105,4 @@ class PickleDB(Client):
             if object in objects:
                 data[i] = update_with.apply(object)
         self._update_data(model=model, new_data=data)
-        return objects
+        return len(objects)

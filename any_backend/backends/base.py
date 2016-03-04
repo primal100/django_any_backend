@@ -39,8 +39,6 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
         self.db_config = args[0]
         compiler_module = self.db_config.get('COMPILER', None) or self.default_compiler
-        cursor_class = self.db_config.get('CURSOR', 'any_backend.backends.cursor.Cursor')
-        self.cursor_class = import_string(cursor_class)
         self._cache = import_module(compiler_module)
         self.ops = DatabaseOperations(self, cache=self._cache)
         self.creation = DatabaseCreation(self)
@@ -50,13 +48,13 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         client_class = import_string(client_class)
         models = get_models_for_db(self.alias)
         self.db_name = self.db_config['NAME']
-        self.client = client_class(self.create_cursor(), self.db_config, models)
-        logger.debug('Initialized django_any_backend. Compiler is %s. Client is %s. Cursor is %s'
-                     % (compiler_module, client_class, cursor_class))
-        logger.debug('DB_config: %s' % (str(self.db_config)))
+        self.client = client_class(self.db_config, models)
+        logger.debug('Initialized django_any_backend. Compiler is %s. Client is %s.'
+                     % (compiler_module, client_class))
+        logger.debug('DB_config: %s' % self.db_config)
 
     def create_cursor(self):
-        return self.cursor_class()
+        return self.client
 
     def get_connection_params(self):
         return{'connection': self.db_config}
