@@ -16,11 +16,11 @@ class Client(object):
 
     def setup(self, db_name):
         """
-        Run when Django app is started
+        Run when client connection is requested
         """
         pass
 
-    def create(self, model, object, app_model):
+    def create(self, model, object):
         """
 
         :param params:
@@ -33,35 +33,48 @@ class Client(object):
 
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
-        raise NotImplementedError('You have not implemented a list func in your connection class')
+        raise NotImplementedError('You have not implemented a list func in your client class')
 
     def delete(self, model, id):
-        raise NotImplementedError('You have not implemented a delete func in your connection class')
+        raise NotImplementedError('You have not implemented a delete func in your client class')
 
     def update(self, model, id, update_with):
-        raise NotImplementedError('You have not implemented an update func in your connection class')
+        raise NotImplementedError('You have not implemented an update func in your client class')
 
-    def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None):
+    def count(self, model, filters, distinct=None):
+        raise NotImplementedError('You have not implemented a count function in your client class')
+
+    def get_pks(self, model, filters):
+        raise NotImplementedError("You have not implemented a get_pks function in your client class")
+
+    def create_table(self, *args):
+        pass
+
+    def execute(self, *args):
+        if "CREATE TABLE" in args[0]:
+            self.create_table(*args)
+
+    def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:
             objects = filters.apply(objects)
         if distinct:
             objects = distinct.apply(objects)
         count = len(objects)
+        if count_only:
+            return count
         if order_by:
             objects = order_by.apply(objects)
         if paginator:
             objects = paginator.apply(objects)
         return objects, count
 
-    def get_pks(self, model, filters):
-        raise NotImplementedError("You have not implemented a get_pks func")
-
     def create_bulk(self, model, objects):
-        created_objects = []
+        pks = []
+        pk_attname = model._meta.pk.attname
         for obj in objects:
             obj = self.create(model, obj)
-            created_objects.append(obj)
-        return obj
+            pks.append(getattr(obj, pk_attname))
+        return pks
 
     def delete_bulk(self, model, filters):
         """
@@ -126,10 +139,7 @@ class Client(object):
         else:
             return []
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def close(self):
         pass
 
     def commit(self):

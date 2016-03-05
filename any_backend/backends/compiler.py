@@ -97,10 +97,11 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 query['paginator'].update(pos, self.chunk_size)
             else:
                 query['paginator'].update(pos, remaining)
-            with self.connection.client as client:
+            cursor = self.connection.cursor()
+            with cursor as client:
                 chunk_results, pre_paginate_count = client.list(self.model, params, **query)
                 chunk_results = self.connection.client.convert_to_tuples(chunk_results, fieldnames)
-                results += chunk_results
+                results.append(chunk_results)
                 if page_size == float('inf'):
                     page_size = pre_paginate_count
                 if self.chunk_size == float('inf'):
@@ -108,10 +109,10 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 else:
                     pos += self.chunk_size
                     remaining = page_size - pos
-                    if len(chunk_results) < self.chunk_size  or len(results) >= page_size:
+                    if len(chunk_results) < self.chunk_size or sum([len(x) for x in results]) >= page_size:
                         remaining = 0
                 logger.debug('Chunk retrieved. %s Remaining. Pos: %s. Pre-paginated count: %s' % (
-                remaining, pos, pre_paginate_count[0]))
+                remaining, pos, pre_paginate_count))
                 logger.debug(chunk_results)
 
         pre_paginate_count = (pre_paginate_count,)
@@ -140,8 +141,10 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
         if count:
             column_names = 'column_names=count'
             key = self.cache_key(query, params, column_names, count=True)
-            with self.connection.client as client:
-                results = (client.count(self.model, params, **query),)
+            results = self.cache_get(key)
+            with self.connection.cursor() as client:
+                results = [(client.count(self.model, params, **query),)]
+                results = self.cache_set(key, results)
         else:
             column_names = 'column_names='
             fieldnames = []
@@ -192,6 +195,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
             else:
                 prefix = 'Count'
                 paginator = ''
+                order_by = ''
         else:
             prefix = 'List'
             paginator = query['paginator']
@@ -231,14 +235,15 @@ class SQLInsertCompiler(compiler.SQLInsertCompiler, CompilerMixin):
         return objs
 
     def execute_sql(self, return_id=False):
-        if self.model._meta.db_table == 'django_migrations':
-            return []
         assert not (return_id and len(self.query.objs) != 1)
         self.return_id = return_id
         self.setup_attributes()
         objects = self.as_sql()
+        if self.model._meta.db_table == 'django_migrations':
+            return []
         logger.debug('Creating objects: %s' % objects)
-        with self.connection.client as client:
+        cursor = self.connection.cursor()
+        with cursor as client:
             pks = client.create_bulk(self.model, objects)
         self.cache.clear()
         if not (return_id and client):
@@ -253,14 +258,18 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, CompilerMixin):
         return filters
 
     def execute_sql(self, result_type=MULTI):
-        if self.model._meta.db_table == 'django_migrations':
-            return 0
         self.setup_attributes()
+        if self.model._meta.db_table == 'django_migrations':
+            return []
         filters = self.as_sql()
         logger.debug('Deleting objects: %s' % filters)
-        with self.connection.client as client:
+        cursor = self.connection.cursor()
+        with cursor as client:
             rows = client.delete_bulk(self.model, filters)
-        self.cache.clear()
+            self.cache.clear()
+            if result_type == 'cursor':
+                client.rowcount = rows
+                return client
         return rows
 
 class SQLUpdateCompiler(compiler.SQLUpdateCompiler, CompilerMixin):
@@ -298,12 +307,13 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, CompilerMixin):
         return result, filters
 
     def execute_sql(self, result_type):
+        self.setup_attributes()
         if self.model._meta.db_table == 'django_migrations':
             return 0
-        self.setup_attributes()
         query, filters = self.as_sql()
         logger.debug('Updating objects %s' % filters)
-        with self.connection.client as client:
+        cursor = self.connection.cursor()
+        with cursor as client:
             rows = client.update_bulk(self.model, filters, **query)
         self.cache.clear()
         return rows

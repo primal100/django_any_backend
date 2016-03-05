@@ -65,7 +65,7 @@ def getvalue(object, attr, returnIfNone='raise'):
     if value_set:
         return value
     elif returnIfNone == 'raise':
-       raise ValueError('Value for ' + attr + ' not found')
+       raise ValueError('Value for %s not found' % attr)
     return returnIfNone
 
 def toDicts(obj_list):

@@ -9,7 +9,7 @@ class Filters(list):
 
     def __repr__(self):
         string = 'Filters='
-        for item in sorted(self, key=operator.itemgetter('field_name')):
+        for item in sorted(self, key=operator.attrgetter('field_name')):
             string += str(item)
         return string
 

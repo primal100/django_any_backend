@@ -78,6 +78,11 @@ class PickleDB(Client):
         objects = filters.apply(objects)
         return objects
 
+    def count(self, model, filters, distinct=None):
+        objects = self._get_data(model=model)
+        count = self.apply_all(objects, filters=filters, distinct=distinct, count_only=True)
+        return count
+
     def list(self, model, filters, paginator=None, order_by=None, distinct=None,
              out_cols=None):
         objects = self._get_data(model=model)

@@ -10,6 +10,8 @@ class CompareWithSQLTestCase(TestCase):
 
 
     def assertQuerysetsEqual(self, qs1, qs2, transform=repr, ordered=True, msg=None):
+        self.assertNotEqual(qs1, None)
+        self.assertNotEqual(qs2, None)
         qs1_items = self.qs_to_list_with_time(transform, qs1)
         qs2_items = self.qs_to_list_with_time(transform, qs2)
         if not ordered:
