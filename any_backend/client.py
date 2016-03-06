@@ -51,8 +51,15 @@ class Client(object):
         pass
 
     def execute(self, *args):
-        if "CREATE TABLE" in args[0]:
+        request = args[0]
+        if type(request) == str and "CREATE TABLE" in args[0]:
             self.create_table(*args)
+        else:
+            client_request = args[0]
+            func = client_request.func
+            args = client_request.args
+            kwargs = client_request.kwargs
+            return func(*args, **kwargs)
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:

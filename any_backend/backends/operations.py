@@ -26,22 +26,5 @@ class DatabaseOperations(BaseDatabaseOperations):
         return name
 
     def last_executed_query(self, cursor, sql, params):
-        """
-        Returns a string of the query last executed by the given cursor, with
-        placeholders replaced with actual values.
-
-        `sql` is the raw query containing placeholders, and `params` is the
-        sequence of parameters. These are used by default, but this method
-        exists for database backends to provide a better implementation
-        according to their own quoting schemes.
-        """
-        # Convert params to contain Unicode values.
-        to_unicode = lambda s: force_text(s, strings_only=True, errors='replace')
-        if isinstance(params, (list, tuple)):
-            u_params = tuple(to_unicode(val) for val in params)
-        elif params is None:
-            u_params = ()
-        else:
-            u_params = str(params)
-
-        return six.text_type("QUERY = %r - PARAMS = %r") % (sql, u_params)
+        query = str(sql)
+        return query

@@ -11,6 +11,19 @@ import logging
 
 logger = logging.getLogger('django')
 
+class ClientRequest(object):
+    def __init__(self, func, key, *args, **kwargs):
+        self.func = func
+        self.key = key
+        self.args = args
+        self.kwargs = kwargs
+
+    def __repr__(self):
+        return "<%s: %s>" % (self.__class__.__name__, self.key)
+
+    def __str__(self):
+        return self.key
+
 class CompilerMixin(object):
 
     def __init__(self, query, connection):
@@ -142,9 +155,11 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
             column_names = 'column_names=count'
             key = self.cache_key(query, params, column_names, count=True)
             results = self.cache_get(key)
-            with self.connection.cursor() as client:
-                results = [(client.count(self.model, params, **query),)]
-                results = self.cache_set(key, results)
+            if not results:
+                with self.connection.cursor() as client:
+                    request = ClientRequest(client.count, key, self.model, params, **query)
+                    results = [(client.execute(request),)]
+                    self.cache_set(key, results)
         else:
             column_names = 'column_names='
             fieldnames = []
@@ -188,7 +203,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
         return results
 
     def cache_key(self, query, params, column_names, count=False):
-        model_name = self.model._meta.model_name
+        model_name = self.model._meta.db_table
         if count:
             if not params and not query['distinct']:
                 return 'Count_All;' + model_name
@@ -198,10 +213,9 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 order_by = ''
         else:
             prefix = 'List'
+            order_by = query['order_by']
             paginator = query['paginator']
-        key = prefix + ';' + model_name + ';' + str(params) + ';' + str(
-            query['distinct']) + ';' + str(column_names) + ';' + str(
-            paginator) + ';' + str(query['order_by'])
+        key = '%s;%s;%s;%s;%s;%s;%s' % (prefix, model_name, params,query['distinct'], column_names, paginator, order_by)
         logger.debug(key)
         return key
 
