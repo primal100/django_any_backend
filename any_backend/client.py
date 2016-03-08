@@ -1,4 +1,5 @@
 from utils import getvalue
+from six import string_types
 
 class Client(object):
     def __init__(self, db_config, models):
@@ -47,19 +48,12 @@ class Client(object):
     def get_pks(self, model, filters):
         raise NotImplementedError("You have not implemented a get_pks function in your client class")
 
-    def create_table(self, *args):
-        pass
-
     def execute(self, *args):
-        request = args[0]
-        if type(request) == str and "CREATE TABLE" in args[0]:
-            self.create_table(*args)
-        else:
-            client_request = args[0]
-            func = client_request.func
-            args = client_request.args
-            kwargs = client_request.kwargs
-            return func(*args, **kwargs)
+        client_request = args[0]
+        func = client_request.func
+        args = client_request.args
+        kwargs = client_request.kwargs
+        return func(*args, **kwargs)
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:

@@ -4,128 +4,201 @@ from django.db.models.query import get_related_populators
 from collections import Counter
 import six
 import time
+from django.conf import settings
 
 class CompareWithSQLTestCase(TestCase):
-    print_times = True
 
+    def compare_all(self, model1, model2, orderby, reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, None, None, orderby, reverse)
+        self.assertQuerysetsEqual(qs1, qs2, msg=msg, **settings)
 
-    def assertQuerysetsEqual(self, qs1, qs2, transform=repr, ordered=True, msg=None):
+    def compare_querysets(self, model1, model2, filters=None, exclude=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, orderby, reverse)
+        self.assertQuerysetsEqual(qs1, qs2, msg=msg, **settings)
+
+    def compare_values(self, model1, model2, filters=None, exclude=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, orderby, reverse)
+        with self.settings(**settings):
+            results1 = qs1.values()
+            results2 = qs2.values()
+        self.assertDictEqual(results1, results2, msg=None)
+
+    def compare_aggregate(self, model1, model2, aggregate, filters=None, exclude=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, orderby, reverse)
+        with self.settings(**settings):
+            result1 = qs1.aggregate(aggregate)
+            result2 = qs2.aggregate(aggregate)
+        self.assertEqual(result1, result2)
+
+    def compare_value_lists(self, model1, model2, filters=None, exclude=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, orderby, reverse)
+        with self.settings(**settings):
+            results1 = qs1.value_list()
+            results2 = qs2.value_list()
+        self.assertListEqual(results1, results2, msg=None)
+
+    def compare_dates(self, model1, model2, dates, filters=None, exclude=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, orderby, reverse)
+        with self.settings(**settings):
+            results1 = qs1.dates(*dates)
+            results2 = qs2.dates(*dates)
+        self.assertListEqual(results1, results2, msg=None)
+
+    def compare_none(self, model1, model2, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, None, (), (), False)
+        with self.settings(**settings):
+            results1 = qs1.None()
+            results2 = qs2.None()
+        self.assertListEqual(results1, results2, msg=None)
+
+    def compare_exist(self, model1, model2, filters=None, exclude=None, distinct=(), msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, None, False)
+        with self.settings(**settings):
+            result1 = qs1.exist()
+            result2 = qs2.exist()
+        self.assertEqual(result1, result2, msg=msg)
+
+    def compare_get(self, model1, model2, filters=None, exclude=None, distinct=(), msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, exclude, distinct, None, False)
+        with self.settings(**settings):
+            result1 = qs1.get()
+            result2 = qs2.get()
+        self.assertEqual(result1, result2, msg=msg)
+
+    def build_qs(self, model, filters, exclude, distinct, orderby, reverse):
+        qs = model.objects.all()
+        if filters:
+            qs = model.objects.filter(**filters)
+        if exclude:
+            qs = qs.exclude(**exclude)
+        if distinct:
+            qs = qs.distinct(*distinct)
+        if orderby:
+            qs = model.all().orderby(*orderby)
+        if reverse:
+                qs = qs.reverse()
+        return qs
+
+    def build_two_qs(self, model1, model2, filters, exclude, distinct, orderby, reverse):
+        qs1 =  self.build_qs(model1, filters, exclude, distinct, orderby, reverse)
+        qs2 =  self.build_qs(model2, filters, exclude, distinct, orderby, reverse)
+        return qs1, qs2
+
+    def compare_first(self, model1, model2, filters=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, distinct, orderby, reverse)
+        with self.settings(**settings):
+            result1 = qs1.first()
+            result2 = qs2.first()
+        self.assertIsNotNone(result1)
+        self.assertIsNotNone(result2)
+        self.assertEqual(result1, result2, msg=msg)
+
+    def compare_last(self, model1, model2, filters=None, distinct=(), orderby=(), reverse=False, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, filters, distinct, orderby, reverse)
+        with self.settings(**settings):
+            result1 = qs1.last()
+            result2 = qs2.larst()
+        self.assertIsNotNone(result1)
+        self.assertIsNotNone(result2)
+        self.assertEqual(result1, result2, msg=msg)
+
+    def assertQuerysetsEqual(self, qs1, qs2, transform=repr, ordered=True, msg=None, **settings):
         self.assertNotEqual(qs1, None)
         self.assertNotEqual(qs2, None)
-        qs1_items = self.qs_to_list_with_time(transform, qs1)
-        qs2_items = self.qs_to_list_with_time(transform, qs2)
+        with self.settings(**settings):
+            qs1_items = six.moves.map(transform, qs1)
+            qs2_items = six.moves.map(transform, qs2)
         if not ordered:
             return self.assertEqual(Counter(qs1_items), Counter(qs2_items), msg=msg)
         qs1_values = list(qs1_items)
         qs2_values = list(qs2_items)
         self.assertEqual(qs1_values, qs2_values, msg=msg)
 
-    def prop_with_time(self, model_table, string, obj, attr):
-        result = self.run_with_time(model_table, string, getattr, obj, attr)
+    def compare_count(self, model1, model2, params, distinct, msg=None, **settings):
+        qs1, qs2 = self.build_two_qs(model1, model2, params, distinct, (), None)
+        with self.settings(**settings):
+            result1 = qs1.count()
+            result2 = qs2.count()
+        self.assertEqual(result1, result2, msg=msg)
+
+    def compare_save(self, model1, model2, params, msg=None, **settings):
+        result1 = self.check_save(model1, params, msg=msg, **settings)
+        result2 = self.check_save(model2, params, msg=msg, **settings)
+        self.assertEqual(result1, result2)
+        self.compare_get(model1, model2, filters=params, msg=msg, **settings)
+
+    def compare_create(self, model1, model2, params, msg=None, **settings):
+        result1 = self.check_create(model1, params, msg=msg, **settings)
+        result2 = self.check_create(model2, params, msg=msg, **settings)
+        self.assertEqual(result1, result2)
+        self.compare_get(model1, model2, filters=params, msg=msg, **settings)
+
+    def compare_update(self, model1, model2, params, filters=None, distinct=(), msg=None, **settings):
+        result1 = self.check_update(model1, params, filters=filters, distinct=distinct, msg=msg, **settings)
+        result2 = self.check_update(model2, params, filters=filters, distinct=distinct, msg=msg, **settings)
+        self.assertEqual(result1, result2)
+        filters.update(params)
+        self.compare_get(model1, model2, filters=filters, distinct=distinct, msg=None, **settings)
+
+    def compare_bulk_create(self, model1, model2, objs, batch_size1=None, batch_size2=None, msg=None **settings):
+        with self.settings(**settings):
+            result1 = model1.objects.bulk_create(objs, batch_size=batch_size1)
+            result2 = model2.objects.bulk_create(objs, batch_size=batch_size2)
+        self.assertEqual(result1, result2)
+        for obj in objs:
+            self.compare_get(model1, model2, filters=obj, msg=msg, **settings)
+
+
+    def compare_update_or_create(self, model1, model2, params, msg=None, **settings):
+        with self.settings(**settings):
+            result1_obj, result1_created = model1.objects.update_or_create(**params)
+            result2_obj, result2_created = model2.objects.update_or_create(**params)
+        self.assertEqual(result1_obj, result2_obj)
+        self.assertEqual(result1_created, result2_created)
+
+    def compare_delete(self, model1, model2, filters=None, distinct=(), msg=None, **settings):
+        result1 = self.check_delete(model1, filters=filters, distinct=distinct, msg=msg, **settings)
+        result2 = self.check_delete(model2, filters=filters, distinct=distinct, msg=msg, **settings)
+        self.assertEqual(result1, result2, msg=msg)
+
+    def check_create(self, model, params, msg=None, **settings):
+        qs = self.build_qs(model, params, (), None, False)
+        with self.settings(**settings):
+            self.assertRaises(qs.get(), model.DoesNotExist, msg=msg)
+            result = model.objects.create(**params)
+            self.assertGreater(qs.count(), 0, msg=msg)
         return result
 
-    def run_with_time(self, model_table, string, func, *args, **kwargs):
-        startTime = time.time()
-        result = func(*args, **kwargs)
-        t = time.time() - startTime
-        if self.print_times:
-            print "%s %s %s: %.3f secs" % (self.id(), model_table, string, t)
+    def compare_get_or_create(self, model1, model2, params, msg=None, **settings):
+        with self.settings(**settings):
+            result1_obj, result1_created = model1.objects.get_or_create(**params)
+            result2_obj, result2_created = model2.objects.get_or_create(**params)
+        self.assertEqual(result1_obj, result2_obj)
+        self.assertEqual(result1_created, result2_created)
+
+    def check_save(self, model, params, msg=None, **settings):
+        qs = self.build_qs(model, params, (), None, False)
+        with self.settings(**settings):
+            self.assertRaises(qs.get(), model.DoesNotExist, msg=msg)
+            instance = model(**params)
+            result = instance.save()
+            self.assertGreater(qs.count(), 0, msg=msg)
         return result
 
-    def save_with_time(self, model):
-        startTime = time.time()
-        result = model.save()
-        t = time.time() - startTime
-        print "%s %s save: %.3f secs" % (self.id(), model._meta.db_table, t)
+    def check_update(self, model, params, filters=None, distinct=(), msg=None, **settings):
+        qs = self.build_qs(model, filters, distinct, None, False)
+        with self.settings(**settings):
+            self.assertGreater(len(qs), 0, msg=msg)
+            result = qs.update(**params)
+            filters.update(params)
+            qs = self.build_qs(model, filters, distinct, None, False)
+            self.assertGreater(qs.count(), 0)
         return result
 
-    def qs_to_list_with_time(self, transform, qs):
-        qs_items = self.run_with_time(qs.model._meta.db_table, 'list', six.moves.map, transform, qs)
-        return qs_items
-
-    def get_with_time(self, qs):
-        result = self.run_with_time(qs.model._meta.db_table, 'get', qs.get)
+    def check_delete(self, model, filters=None, distinct=(), msg=None, **settings):
+        qs = self.build_qs(model, filters, distinct, None, False)
+        self.assertGreater(qs.count(), 0, msg=msg)
+        with self.settings(**settings):
+            result = qs.delete()
+            self.assertRaises(qs.get(), model.DoesNotExist, msg=msg)
         return result
-
-    def count_with_time(self, qs):
-        result = self.run_with_time(qs.model._meta.db_table, 'count', qs.count)
-        return result
-
-    def first_with_time(self, qs):
-        result = self.run_with_time(qs.model._meta.db_table, 'first', qs.first)
-        return result
-
-    def last_with_time(self, qs):
-        result = self.run_with_time(qs.model._meta.db_table, 'last', qs.last)
-        return result
-
-    def delete_with_time(self, qs):
-        result = self.run_with_time(qs.model._meta.db_table, 'delete', qs.delete)
-        return result
-
-    def breakdown_queryset(self, queryset):
-        db = queryset.db
-        compiler = queryset.query.get_compiler(using=db)
-        sql, params = self.run_with_time(queryset.model._meta.db_table, 'compiler.as_sql', compiler.as_sql)
-        cursor = compiler.connection.cursor()
-        self.run_with_time(queryset.model._meta.db_table, 'cursor.execute', cursor.execute, sql, params)
-        results = []
-        cursor = cursor.cursor
-        cursor.results = None
-        while cursor.results != []:
-            if not cursor.full_request_size or cursor.pos <= cursor.full_request_size:
-                cursor.query['paginator'].update(cursor.pos, cursor.size)
-                cursor.results, cursor.pre_paginate_count = self.run_with_time(queryset.model._meta.db_table, 'get_results', cursor.func,
-                                                                               cursor.model, cursor.params,
-                                                                               **cursor.query)
-                cursor.results = self.run_with_time(queryset.model._meta.db_table, 'cursor.conversion_func', cursor.conversion_func, cursor.results, cursor.fieldnames)
-                cursor.full_request_size = cursor.page_size if cursor.paginated else cursor.pre_paginate_count
-                if cursor.size:
-                    cursor.pos += cursor.size
-                else:
-                    cursor.pos += cursor.pre_paginate_count + 1
-                cursor.pre_paginate_count = (cursor.pre_paginate_count,)
-            else:
-                cursor.results = []
-            results += cursor.results
-        results = [results]
-        select, klass_info, annotation_col_map = (compiler.select, compiler.klass_info,
-                                                  compiler.annotation_col_map)
-        if klass_info is None:
-            return
-        model_cls = klass_info['model']
-        select_fields = klass_info['select_fields']
-        model_fields_start, model_fields_end = select_fields[0], select_fields[-1] + 1
-        init_list = [f[0].target.attname
-                     for f in select[model_fields_start:model_fields_end]]
-        if len(init_list) != len(model_cls._meta.concrete_fields):
-            init_set = set(init_list)
-            skip = [f.attname for f in model_cls._meta.concrete_fields
-                    if f.attname not in init_set]
-            model_cls = deferred_class_factory(model_cls, skip)
-        related_populators = get_related_populators(klass_info, select, db)
-        startTime = time.time()
-        for row in compiler.results_iter(results):
-            obj = model_cls.from_db(db, init_list, row[model_fields_start:model_fields_end])
-            if related_populators:
-                for rel_populator in related_populators:
-                    rel_populator.populate(row, obj)
-            if annotation_col_map:
-                for attr_name, col_pos in annotation_col_map.items():
-                    setattr(obj, attr_name, row[col_pos])
-
-            # Add the known related objects to the model, if there are any
-            if queryset._known_related_objects:
-                for field, rel_objs in queryset._known_related_objects.items():
-                    # Avoid overwriting objects loaded e.g. by select_related
-                    if hasattr(obj, field.get_cache_name()):
-                        continue
-                    pk = getattr(obj, field.get_attname())
-                    try:
-                        rel_obj = rel_objs[pk]
-                    except KeyError:
-                        pass  # may happen in qs1 | qs2 scenarios
-                    else:
-                        setattr(obj, field.name, rel_obj)
-        t = time.time() - startTime
-        print "%s %s objects2models: %.3f secs" % (self.id(), queryset.model._meta.db_table, t)
