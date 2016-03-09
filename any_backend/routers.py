@@ -1,4 +1,4 @@
-from utils import backend_is_non_db
+from utils import backend_is_non_db, get_db_by_name
 
 class BackendRouter(object):
     """
@@ -22,4 +22,4 @@ class BackendRouter(object):
         return None
 
     def allow_migrate(self, db, app_label, model=None, **hints):
-        return not backend_is_non_db(db)
+        return True
