@@ -46,7 +46,7 @@ class CompilerMixin(object):
         self.fieldnames = [(self.pk_fieldname,)]
         self.db_config = self.connection.settings_dict
         self.max_relation_depth = self.db_config.get('MAX_RELATION_DEPTH', 10)
-        self.chunk_size = getattr(self.model._meta, 'chunk_size', None) or self.db_config.get('CHUNK_SIZE', float('inf'))
+        self.chunk_size = getattr(self.model, 'max_per_request', None) or self.db_config.get('CHUNK_SIZE', float('inf'))
         cache = self.db_config.get('CACHE', None)
         if cache:
             cache_name = cache['NAME']

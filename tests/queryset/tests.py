@@ -1,4 +1,5 @@
-from tests.base import PickleDBTest
+from ..base import PickleDBTest
+
 
 class PickleDBQuerysetTests(PickleDBTest):
 
