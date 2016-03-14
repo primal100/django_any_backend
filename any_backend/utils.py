@@ -9,7 +9,7 @@ def get_db_by_name(name):
 
 def check_can_migrate(name):
     db = get_db_by_name(name)
-    return 'SCHEMA' in db.keys()
+    return db.get('MIGRATIONS', False)
 
 def get_model_by_name(app_label, model_name):
     return apps.get_model(app_label=app_label, model_name=model_name)

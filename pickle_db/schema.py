@@ -15,10 +15,13 @@ class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):
         return os.path.exists(db_name)
 
     def create_model(self, model):
-        super(DatabaseSchemaEditor, self).create_model(model)
         data = self.connection.client.get_data()
-        data[model._meta.db_table] = []
-        self.connection.client.update_data(data)
+        table = model._meta.db_table
+        if table in data.keys():
+            raise NameError('Table %s already exists. Problem may be with introspection get_table_list function' % (table))
+        else:
+            data[table] = []
+            self.connection.client.update_data(data)
 
     def delete_model(self, model):
         data = self.connection.client.get_data()

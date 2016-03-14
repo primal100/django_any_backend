@@ -87,6 +87,8 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.pickle'),
         'CLIENT': 'pickle_db.client.PickleDB',
         'SCHEMA': 'pickle_db.schema',
+        'INTROSPECTION': 'pickle_db.introspection',
+        'MIGRATIONS': True,
         'TEST': {
             'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
             'SERIALIZE': False,

@@ -166,9 +166,9 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
         if count:
             results = self.cache_get(request.key)
             if not results:
-                with self.connection.cursor as cursor:
+                with self.connection.cursor() as cursor:
                     result = cursor.execute(request)
-                    results = [(result),]
+                    results = [((result),)]
                     self.cache_set(request.key, results)
         else:
             count_key = self.key(request.args[3], request.kwargs, 'column_names=count', True)
@@ -207,6 +207,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
             order_by = query['order_by']
             paginator = query['paginator']
         key = '%s;%s;%s;%s;%s;%s;%s' % (prefix, model_name, params, query['distinct'], column_names, paginator, order_by)
+        key = key.strip()
         logger.debug(key)
         return key
 
@@ -278,7 +279,7 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, CompilerMixin):
         with self.connection.cursor as cursor:
             rows = cursor.execute(request)
             self.cache.clear()
-            if result_type == 'cursor':
+            if result_type == CURSOR:
                 return cursor
         return rows
 
@@ -334,9 +335,11 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, CompilerMixin):
         if not self.connection.migrations and self.model._meta.db_table == 'django_migrations':
             return 0
         request = self.as_sql()
-        with self.connection.cursor as cursor:
+        with self.connection.cursor() as cursor:
             rows = cursor.execute(request)
         self.cache.clear()
+        if result_type == CURSOR:
+            return self.connection.cursor
         return rows
 
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler, CompilerMixin):

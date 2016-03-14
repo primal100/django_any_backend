@@ -41,20 +41,24 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.db_config = args[0]
         compiler_module = self.db_config.get('COMPILER', None) or self.default_compiler
         schema_module = self.db_config.get('SCHEMA', None)
-        self.migrations = False
+        self.migrations = self.db_config.get('MIGRATIONS', False)
         if schema_module:
-            self.migrations = True
             self.SchemaEditorClass = import_string(schema_module + '.DatabaseSchemaEditor')
         self._cache = import_module(compiler_module)
         self.ops = DatabaseOperations(self, cache=self._cache)
         self.creation = DatabaseCreation(self)
         self.features = DatabaseFeatures(self)
-        self.introspection = DatabaseIntrospection(self)
         self.validation = BaseDatabaseValidation(self)
         client_class = self.db_config['CLIENT']
         client_class = import_string(client_class)
         self.db_name = self.db_config['NAME']
         self.client = client_class(self.db_config)
+        introspection_module = self.db_config.get('INTROSPECTION', None)
+        if introspection_module:
+            self.introspectionClass = import_string(introspection_module + '.DatabaseIntrospection')
+            self.introspection = self.introspectionClass(self)
+        else:
+            self.introspection = DatabaseIntrospection(self)
         logger.debug('Initialized django_any_backend. Compiler is %s. Client is %s.'
                      % (compiler_module, client_class))
         logger.debug('DB_config: %s' % self.db_config)
