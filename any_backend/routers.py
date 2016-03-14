@@ -1,4 +1,4 @@
-from utils import backend_is_non_db
+from utils import backend_is_non_db, check_can_migrate, get_models_for_db, get_model_by_name
 
 class BackendRouter(object):
     """
@@ -16,6 +16,15 @@ class BackendRouter(object):
         return None
 
     def allow_migrate(self, db, app_label, model=None, **hints):
-        if backend_is_non_db(db) and any(hints.get("model_name", None) == x for x in ['contenttype', 'permission']):
+        model_name = hints.get('model_name', None)
+        if app_label and model_name:
+            model = get_model_by_name(app_label, model_name)
+        if model:
+            non_db = self.db_for_read(model)
+            if non_db == db:
+                return check_can_migrate(db)
+            if not non_db and not backend_is_non_db(db):
+                return True
             return False
-        return True
+        else:
+            return True

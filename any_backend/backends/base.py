@@ -4,10 +4,11 @@ from .database import Database
 from .schema import DatabaseSchemaEditor
 from .introspection import DatabaseIntrospection
 from django.db.backends.base.base import BaseDatabaseWrapper
+from django.db.backends.base.validation import BaseDatabaseValidation
 from django.utils.module_loading import import_string
 from operations import DatabaseOperations
 from importlib import import_module
-from any_backend.utils import get_models_for_db
+from cursor import Cursor
 import logging
 
 logger = logging.getLogger('django')
@@ -39,11 +40,17 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         super(DatabaseWrapper, self).__init__(*args, **kwargs)
         self.db_config = args[0]
         compiler_module = self.db_config.get('COMPILER', None) or self.default_compiler
+        schema_module = self.db_config.get('SCHEMA', None)
+        self.migrations = False
+        if schema_module:
+            self.migrations = True
+            self.SchemaEditorClass = import_string(schema_module + '.DatabaseSchemaEditor')
         self._cache = import_module(compiler_module)
         self.ops = DatabaseOperations(self, cache=self._cache)
         self.creation = DatabaseCreation(self)
         self.features = DatabaseFeatures(self)
         self.introspection = DatabaseIntrospection(self)
+        self.validation = BaseDatabaseValidation(self)
         client_class = self.db_config['CLIENT']
         client_class = import_string(client_class)
         self.db_name = self.db_config['NAME']
@@ -53,16 +60,15 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         logger.debug('DB_config: %s' % self.db_config)
 
     def create_cursor(self):
-        return self.client
+        return Cursor()
 
     def get_connection_params(self):
         return{'connection': self.db_config}
 
     def get_new_connection(self, conn_params):
-        models = get_models_for_db(self.alias)
-        if not self.client.db_exists(self.db_name):
-            self.client.create_db(self.db_name)
-        self.client.setup(self.db_name, models)
+        if not self.schema_editor().db_exists(self.db_name):
+            self.schema_editor().create_db(self.db_name)
+        self.client.setup(self.db_name)
         return self.client
 
     def is_usable(self):

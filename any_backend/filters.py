@@ -14,6 +14,9 @@ class Filters(list):
         return string
 
     def to_dict(self):
+        """
+        Doesn't include excludes or filters which are not exact or iexact
+        """
         dictionary = {}
         for filter in self:
             if filter.operator == 'exact':
@@ -23,11 +26,12 @@ class Filters(list):
         return dictionary
 
 class Filter(object):
-    def __init__(self, field, operator, value):
+    def __init__(self, field, operator, is_exclude, value):
         self.field = field
         self.field_name = field.column
         self.field_type = field.get_internal_type()
         self.operator = operator
+        self.is_exclude = is_exclude
         self.value = value
 
     def __repr__(self):
@@ -41,31 +45,61 @@ class Filter(object):
         return value
 
     def apply(self, objlist):
-        if self.operator == 'exact':
-            return [d for d in objlist if self.get(d, True) == self.value]
-        elif self.operator == 'iexact':
-            return [d for d in objlist if self.get(d, False) == self.value.lower()]
-        elif self.operator == 'contains':
-            return [d for d in objlist if self.value in self.get(d, True)]
-        elif self.operator == 'icontains':
-            return [d for d in objlist if self.value.lower() in self.get(d, False)]
-        elif self.operator == 'in':
-            return [d for d in objlist if self.get(d, True) in self.value]
-        elif self.operator == 'gt':
-            return [d for d in objlist if self.get(d, True) > self.value]
-        elif self.operator == 'gte':
-            return [d for d in objlist if self.get(d, True) >= self.value]
-        elif self.operator == 'lt':
-            return [d for d in objlist if self.get(d, True) < self.value]
-        elif self.operator == 'lte':
-            return [d for d in objlist if self.get(d, True) <= self.value]
-        elif self.operator == 'startswith':
-            return [d for d in objlist if self.get(d, True).startswith(self.value)]
-        elif self.operator == 'istartswith':
-            return [d for d in objlist if self.get(d, False).lower().startswith(self.value.lower())]
-        elif self.operator == 'endswith':
-            return [d for d in objlist if self.get(d, True).endswith(self.value)]
-        elif self.operator == 'iendswith':
-            return [d for d in objlist if self.get(d, False).endswith(self.value.lower())]
+        if self.is_exclude:
+            if self.operator == 'exact':
+                return [d for d in objlist if not self.get(d, True) == self.value]
+            elif self.operator == 'iexact':
+                return [d for d in objlist if not self.get(d, False) == self.value.lower()]
+            elif self.operator == 'contains':
+                return [d for d in objlist if not self.value in self.get(d, True)]
+            elif self.operator == 'icontains':
+                return [d for d in objlist if not self.value.lower() in self.get(d, False)]
+            elif self.operator == 'in':
+                return [d for d in objlist if not self.get(d, True) in self.value]
+            elif self.operator == 'gt':
+                return [d for d in objlist if not self.get(d, True) > self.value]
+            elif self.operator == 'gte':
+                return [d for d in objlist if not self.get(d, True) >= self.value]
+            elif self.operator == 'lt':
+                return [d for d in objlist if not self.get(d, True) < self.value]
+            elif self.operator == 'lte':
+                return [d for d in objlist if not self.get(d, True) <= self.value]
+            elif self.operator == 'startswith':
+                return [d for d in objlist if not self.get(d, True).startswith(self.value)]
+            elif self.operator == 'istartswith':
+                return [d for d in objlist if not self.get(d, False).lower().startswith(self.value.lower())]
+            elif self.operator == 'endswith':
+                return [d for d in objlist if not self.get(d, True).endswith(self.value)]
+            elif self.operator == 'iendswith':
+                return [d for d in objlist if not self.get(d, False).endswith(self.value.lower())]
+            else:
+                raise NotImplementedError('Operator ' + self.operator + ' not supported.')
         else:
-            raise NotImplementedError('Operator ' + self.operator + ' not supported.')
+            if self.operator == 'exact':
+                return [d for d in objlist if self.get(d, True) == self.value]
+            elif self.operator == 'iexact':
+                return [d for d in objlist if self.get(d, False) == self.value.lower()]
+            elif self.operator == 'contains':
+                return [d for d in objlist if self.value in self.get(d, True)]
+            elif self.operator == 'icontains':
+                return [d for d in objlist if self.value.lower() in self.get(d, False)]
+            elif self.operator == 'in':
+                return [d for d in objlist if self.get(d, True) in self.value]
+            elif self.operator == 'gt':
+                return [d for d in objlist if self.get(d, True) > self.value]
+            elif self.operator == 'gte':
+                return [d for d in objlist if self.get(d, True) >= self.value]
+            elif self.operator == 'lt':
+                return [d for d in objlist if self.get(d, True) < self.value]
+            elif self.operator == 'lte':
+                return [d for d in objlist if self.get(d, True) <= self.value]
+            elif self.operator == 'startswith':
+                return [d for d in objlist if self.get(d, True).startswith(self.value)]
+            elif self.operator == 'istartswith':
+                return [d for d in objlist if self.get(d, False).lower().startswith(self.value.lower())]
+            elif self.operator == 'endswith':
+                return [d for d in objlist if self.get(d, True).endswith(self.value)]
+            elif self.operator == 'iendswith':
+                return [d for d in objlist if self.get(d, False).endswith(self.value.lower())]
+            else:
+                raise NotImplementedError('Operator ' + self.operator + ' not supported.')

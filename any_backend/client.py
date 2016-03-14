@@ -1,22 +1,12 @@
 from utils import getvalue
-from six import string_types
 
 class Client(object):
     def __init__(self, db_config):
         self.db_config = db_config
-        self.models = []
+        self.name = self.db_config['NAME']
 
-    def create_db(self, db_name, models):
-        self.models = models
-
-    def delete_db(self, db_name):
-        pass
-
-    def db_exists(self, db_name):
-        return True
-
-    def setup(self, db_name, models):
-        self.models = models
+    def setup(self, db_name):
+        self.name = db_name
 
     def create(self, model, object):
         """
@@ -44,13 +34,6 @@ class Client(object):
 
     def get_pks(self, model, filters):
         raise NotImplementedError("You have not implemented a get_pks function in your client class")
-
-    def execute(self, *args):
-        client_request = args[0]
-        func = client_request.func
-        args = client_request.args
-        kwargs = client_request.kwargs
-        return func(*args, **kwargs)
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:

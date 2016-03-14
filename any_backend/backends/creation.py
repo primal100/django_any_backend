@@ -18,7 +18,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             return test_database_name
 
         try:
-            self.connection.client.create_db(test_database_name),
+            self.connection.schema_editor().create_db(test_database_name),
         except Exception as e:
                 if keepdb:
                     return test_database_name
@@ -34,8 +34,8 @@ class DatabaseCreation(BaseDatabaseCreation):
                             print("Destroying old test non-db backend for alias %s..." % (
                                 self._get_database_display_str(verbosity, test_database_name),
                             ))
-                        self.connection.client.delete_db(test_database_name)
-                        self.connection.client.create_db(test_database_name)
+                        self.connection.schema_editor().delete_db(test_database_name)
+                        self.connection.schema_editor().create_db(test_database_name)
                     except Exception as e:
                         sys.stderr.write(
                             "Got an error recreating the test non-db backend: %s\n" % e)

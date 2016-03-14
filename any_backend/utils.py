@@ -1,10 +1,18 @@
 from django.conf import settings
 from importlib import import_module
 from django.contrib.contenttypes.models import ContentType
+from django.apps import apps
 
 def get_db_by_name(name):
     db = settings.DATABASES[name]
     return db
+
+def check_can_migrate(name):
+    db = get_db_by_name(name)
+    return 'SCHEMA' in db.keys()
+
+def get_model_by_name(app_label, model_name):
+    return apps.get_model(app_label=app_label, model_name=model_name)
 
 def get_models_for_db(db_alias):
     models = []
@@ -28,15 +36,6 @@ def backend_is_non_db(name):
     db_wrapper_class = get_wrapper_by_db_name(name)
     is_non_db = getattr(db_wrapper_class, 'is_non_db', False)
     return is_non_db
-
-def get_db_for_model(model):
-    dbs = settings.DATABASES
-    db_table = model._meta.db_table
-    for k, v in dbs.iteritems():
-        models = v.get('MODELS', [])
-        if any(db_table.lower() == x.lower() for x in models):
-            return k
-    return None
 
 def make_dict_from_obj(object):
     obj2dict = {}
