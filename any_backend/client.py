@@ -2,12 +2,12 @@ from utils import getvalue
 from six import string_types
 
 class Client(object):
-    def __init__(self, db_config, models):
+    def __init__(self, db_config):
         self.db_config = db_config
-        self.models = models
+        self.models = []
 
-    def create_db(self, db_name):
-        pass
+    def create_db(self, db_name, models):
+        self.models = models
 
     def delete_db(self, db_name):
         pass
@@ -15,11 +15,8 @@ class Client(object):
     def db_exists(self, db_name):
         return True
 
-    def setup(self, db_name):
-        """
-        Run when client connection is requested
-        """
-        pass
+    def setup(self, db_name, models):
+        self.models = models
 
     def create(self, model, object):
         """

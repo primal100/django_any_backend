@@ -6,7 +6,8 @@ from django.core.cache import caches
 
 class PickleDB(Client):
 
-    def create_db(self, db_name):
+    def create_db(self, db_name, models):
+        self.models = models
         self.cache = caches['pickle_cache']
         self.filename = db_name
         self._update_data(new=True)
@@ -18,7 +19,8 @@ class PickleDB(Client):
         self.filename = db_name
         return os.path.exists(self.filename)
 
-    def setup(self, db_name):
+    def setup(self, db_name, models):
+        self.models = models
         self.filename = db_name
         self.cache = caches['pickle_cache']
 

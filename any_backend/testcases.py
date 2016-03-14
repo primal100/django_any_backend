@@ -5,6 +5,9 @@ from django.conf import settings
 
 class CompareWithSQLTestCase(TestCase):
 
+    def setUp(self):
+        self.override_settings = {}
+
     def assertQuerysetsEqual(self, qs1, qs2, transform=repr, ordered=True, msg=None, **settings):
         self.assertIsNotNone(qs1, msg=msg)
         self.assertIsNotNone(qs2, msg=msg)
@@ -105,13 +108,13 @@ class CompareWithSQLTestCase(TestCase):
         self.assertEqual(result1, result2, msg=msg)
         self.assertGetEqual(qs1.count(), qs2.count(), msg=msg, **settings)
 
-    def assertBulkCreateEqual(self, model1, model2, objs, batch_size1=None, batch_size2=None, msg=None **settings):
+    def assertBulkCreateEqual(self, model1, model2, objs1, objs2, batch_size1=None, batch_size2=None, msg=None, **settings):
         with self.settings(**settings):
-            result1 = model1.objects.bulk_create(objs, batch_size=batch_size1)
-            result2 = model2.objects.bulk_create(objs, batch_size=batch_size2)
+            result1 = model1.objects.bulk_create(objs1, batch_size=batch_size1)
+            result2 = model2.objects.bulk_create(objs2, batch_size=batch_size2)
         self.assertEqual(result1, result2, msg=msg)
-        for obj in objs:
-            self.assertGetEqual(model1, model2, filters=obj, msg=msg, **settings)
+        """for obj in objs1:
+            self.assertGetEqual(model1, model2, filters=obj, msg=msg, **settings)"""
 
     def assertGetOrCreateEqual(self, model1, model2, params, msg=None, **settings):
         with self.settings(**settings):
@@ -120,10 +123,10 @@ class CompareWithSQLTestCase(TestCase):
         self.assertEqual(result1_obj, result2_obj, msg=msg)
         self.assertEqual(result1_created, result2_created, msg=msg)
 
-    def assertUpdateOrCreateEqual(self, model1, model2, params, msg=None, **settings):
+    def assertUpdateOrCreateEqual(self, model1, model2, defaults, params, msg=None, **settings):
         with self.settings(**settings):
-            result1_obj, result1_created = model1.objects.update_or_create(**params)
-            result2_obj, result2_created = model2.objects.update_or_create(**params)
+            result1_obj, result1_created = model1.objects.update_or_create(defaults=defaults, **params)
+            result2_obj, result2_created = model2.objects.update_or_create(defaults=defaults, **params)
         self.assertEqual(result1_obj, result2_obj, msg=msg)
         self.assertEqual(result1_created, result2_created, msg=msg)
 

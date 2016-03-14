@@ -46,9 +46,8 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         self.introspection = DatabaseIntrospection(self)
         client_class = self.db_config['CLIENT']
         client_class = import_string(client_class)
-        models = get_models_for_db(self.alias)
         self.db_name = self.db_config['NAME']
-        self.client = client_class(self.db_config, models)
+        self.client = client_class(self.db_config)
         logger.debug('Initialized django_any_backend. Compiler is %s. Client is %s.'
                      % (compiler_module, client_class))
         logger.debug('DB_config: %s' % self.db_config)
@@ -60,9 +59,10 @@ class DatabaseWrapper(BaseDatabaseWrapper):
         return{'connection': self.db_config}
 
     def get_new_connection(self, conn_params):
+        models = get_models_for_db(self.alias)
         if not self.client.db_exists(self.db_name):
             self.client.create_db(self.db_name)
-        self.client.setup(self.db_name)
+        self.client.setup(self.db_name, models)
         return self.client
 
     def is_usable(self):

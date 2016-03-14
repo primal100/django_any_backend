@@ -1,9 +1,7 @@
 import pycountry
 from any_backend.testcases import CompareWithSQLTestCase
-from sql_testapp.models import Country as SQLCountry, Subdivision as SQLSubdivision
-from testapp.models import Country, Subdivision
 
-def populate():
+"""def populate():
     models_list = ((SQLCountry, SQLSubdivision), (Country, Subdivision))
     for models in models_list:
         country_model = models[0]
@@ -20,10 +18,9 @@ def populate():
                     country = country_model.objects.filter(alpha2=subdivision.country_code).get()
                     instance = subdivision_model(name=subdivision.name, code=subdivision.code, country=country, type=subdivision.type)
                     subdivision_instances.append(instance)
-            subdivision_model.objects.bulk_create(subdivision_instances)
+            subdivision_model.objects.bulk_create(subdivision_instances)"""
 
 class PickleDBTest(CompareWithSQLTestCase):
+    fixtures = ["chinookdata.default.json", "chinookdata.pickle_db.json"]
     def setUp(self):
-        populate()
-        self.models_list = ((SQLCountry, SQLSubdivision), (Country, Subdivision))
         self.override_settings = {'DEBUG': True}

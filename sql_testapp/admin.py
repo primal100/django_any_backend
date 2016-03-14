@@ -1,17 +1,24 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin, TabularInline
-from models import Country, Subdivision
+from models import Artist, Playlist, Track
 
-class SubdivisionAdmin(TabularInline):
-    list_display = ('name', 'club', 'age')
-    model = Subdivision
-    can_delete = True
-    fields = ('name', 'code', 'country', 'type')
+class PlaylistAdmin(ModelAdmin):
+    list_display = ('name', 'rating')
+    filter_horizontal = ('tracks',)
 
-class CountryAdmin(ModelAdmin):
-    list_display = ('name', 'alpha2', 'numeric')
-    inlines = (SubdivisionAdmin, )
+class TrackAdmin(ModelAdmin):
     list_max_show_all = True
-    list_per_page = 3
 
-admin.site.register(Country, CountryAdmin)
+class InlineTrackAdmin(TabularInline):
+    list_display = ('name', 'album', 'release_date')
+    model = Track
+    can_delete = True
+    fields = ('name', 'album', 'release_date')
+
+class ArtistAdmin(ModelAdmin):
+    list_display = ('name', 'type', 'genre')
+    inlines = (InlineTrackAdmin, )
+
+admin.site.register(Artist, ArtistAdmin)
+admin.site.register(Playlist, PlaylistAdmin)
+admin.site.register(Track, TrackAdmin)

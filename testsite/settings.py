@@ -88,6 +88,7 @@ DATABASES = {
         'CLIENT': 'pickle_db.client.PickleDB',
         'TEST': {
             'NAME': os.path.join(BASE_DIR, 'dbtest.pickle'),
+            'SERIALIZE': False,
         },
         'CACHE': {
             'NAME': 'default',
@@ -160,7 +161,7 @@ LOGGING = {
     },
     'handlers': {
         'console': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'filters': ['require_debug_true'],
             'class': 'logging.StreamHandler',
         },

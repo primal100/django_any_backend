@@ -1,3 +1,5 @@
+from utils import backend_is_non_db
+
 class BackendRouter(object):
     """
     A router to send all non-db models to the correct backend
@@ -14,4 +16,6 @@ class BackendRouter(object):
         return None
 
     def allow_migrate(self, db, app_label, model=None, **hints):
+        if backend_is_non_db(db) and any(hints.get("model_name", None) == x for x in ['contenttype', 'permission']):
+            return False
         return True
