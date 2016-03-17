@@ -47,7 +47,7 @@ class DatabaseCreation(BaseDatabaseCreation):
         return test_database_name
 
     def _destroy_test_db(self, test_database_name, verbosity):
-        self.connection.client.delete_db(test_database_name)
+        self.connection.schema_editor().delete_db(test_database_name)
 
     def test_db_signature(self):
         """

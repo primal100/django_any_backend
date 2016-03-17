@@ -58,40 +58,6 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 field_tuple += self.get_related(field, relation.model)
         return field_tuple
 
-    def get_list(self, key, model, filters, query, fieldnames):
-        results = []
-        remaining = self.page_size
-        pos = 0
-        pre_paginate_count = 0
-        logger.debug('Retrieving result list. Page_size: %s. Chunk_size: %s' % (self.page_size, self.chunk_size))
-        while remaining > 0:
-            if self.chunk_size < remaining:
-                query['paginator'].update(pos, self.chunk_size)
-            else:
-                query['paginator'].update(pos, remaining)
-            key = '%s, pos=%s' % (key, pos)
-            request = CursorRequest(self.connection.client.list, key, model, filters, **query)
-            with self.connection.cursor() as cursor:
-                chunk_results, pre_paginate_count = cursor.execute(request)
-                chunk_results = self.connection.client.convert_to_tuples(chunk_results, fieldnames)
-                results.append(chunk_results)
-                if self.page_size == float('inf'):
-                    self.page_size = pre_paginate_count
-                if self.chunk_size == float('inf'):
-                    remaining = 0
-                else:
-                    pos += self.chunk_size
-                    remaining = self.page_size - pos
-                    if len(chunk_results) < self.chunk_size or sum([len(x) for x in results]) >= self.page_size:
-                        remaining = 0
-                logger.debug('Chunk retrieved. %s Remaining. Pos: %s. Pre-paginated count: %s' % (
-                remaining, pos, pre_paginate_count))
-                logger.debug(chunk_results)
-
-        pre_paginate_count = (pre_paginate_count,)
-
-        return results, pre_paginate_count
-
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
         query, params = {}, {}
 
@@ -138,7 +104,8 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
             query['paginator'] = self.paginator
 
             key = self.key(query, filters, column_names)
-            request = CursorRequest(self.get_list, key, key, self.model, filters, query, fieldnames)
+            request = CursorRequest(get_list, key, self.connection, key, self.model, filters, query, fieldnames,
+                                    self.page_size, self.chunk_size)
         return request, count
 
     def execute_sql(self, result_type=MULTI):
@@ -154,7 +121,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                                                    self.connection.ops.no_limit_value())
         if result_type == SINGLE:
             self.query.high_mark = self.query.low_mark + 1
-            self.chunk_size = 1
+            self.page_size = 1
         else:
             if self.paginator.paginated:
                 self.page_size = self.paginator.page_size
@@ -171,7 +138,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                     results = [((result),)]
                     self.cache_set(request.key, results)
         else:
-            count_key = self.key(request.args[3], request.kwargs, 'column_names=count', True)
+            count_key = self.key(request.args[4], request.kwargs, 'column_names=count', True)
             results = self.cache_get(request.key)
             pre_paginate_count = self.cache_get(count_key)
             if results is None or pre_paginate_count is None:
@@ -363,3 +330,38 @@ class SQLAggregateCompiler(compiler.SQLAggregateCompiler, CompilerMixin):
         prefix = 'Aggregate Count'
         key = '%s;%s;' % (prefix, model_name)
         return key
+
+
+def get_list(connection, key, model, filters, query, fieldnames, page_size, chunk_size):
+    results = []
+    remaining = page_size
+    pos = 0
+    pre_paginate_count = 0
+    logger.debug('Retrieving result list. Page_size: %s. Chunk_size: %s' % (page_size, chunk_size))
+    while remaining > 0:
+        if chunk_size < remaining:
+            query['paginator'].update(pos, chunk_size)
+        else:
+            query['paginator'].update(pos, remaining)
+        key = '%s, pos=%s' % (key, pos)
+        request = CursorRequest(connection.client.list, key, model, filters, **query)
+        with connection.cursor() as cursor:
+            chunk_results, pre_paginate_count = cursor.execute(request)
+            chunk_results = connection.client.convert_to_tuples(chunk_results, fieldnames)
+            results.append(chunk_results)
+            if page_size == float('inf'):
+                self.page_size = pre_paginate_count
+            if chunk_size == float('inf'):
+                remaining = 0
+            else:
+                pos += chunk_size
+                remaining = page_size - pos
+                if len(chunk_results) < chunk_size or sum([len(x) for x in results]) >= page_size:
+                    remaining = 0
+            logger.debug('Chunk retrieved. %s Remaining. Pos: %s. Pre-paginated count: %s' % (
+            remaining, pos, pre_paginate_count))
+            logger.debug(chunk_results)
+
+    pre_paginate_count = (pre_paginate_count,)
+
+    return results, pre_paginate_count

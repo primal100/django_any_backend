@@ -4,7 +4,7 @@ from sql_testapp.models import Track as SQLTrack
 
 class PickleDBQuerysetTests(PickleDBTest):
 
-    def test_qs(self):
+    """def test_qs(self):
         filters = {"composer": "U2"}
         excludes = {"name": "Zoo Station"}
         order_by = ["milliseconds"]
@@ -36,17 +36,20 @@ class PickleDBQuerysetTests(PickleDBTest):
             *order_by).reverse()[pagination[0]:pagination[1]]
         qs2 = Track.objects.filter(**filters).exclude(**excludes).distinct(*distinct).order_by(
             *order_by).reverse()[pagination[0]:pagination[1]]
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)"""
 
     def test_count(self):
         filters = {"composer": "U2"}
         excludes = {"name": "Zoo Station"}
         distinct = ["albumid"]
+        qs1 = SQLTrack.objects
+        qs2 = Track.objects
+        self.assertCountEqual(qs1, qs2)
         qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes).distinct(*distinct)
         qs2 = Track.objects.filter(**filters).exclude(**excludes).distinct(*distinct)
         self.assertCountEqual(qs1, qs2, **self.override_settings)
 
-    def test_one_results(self):
+    """def test_one_results(self):
         filters = {"name": "Man In The Box"}
         qs1 = SQLTrack.objects.filter(filters)
         qs2 = Track.objects.filter(filters)
@@ -137,4 +140,4 @@ class PickleDBQuerysetTests(PickleDBTest):
         self.assertUpdateOrCreateEqual(SQLTrack, Track, defaults2, params, **self.override_settings)
 
     def test_annotate_aggregrate(self):
-        pass
+        pass"""

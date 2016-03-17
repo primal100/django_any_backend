@@ -21,6 +21,8 @@ from any_backend.testcases import CompareWithSQLTestCase
             subdivision_model.objects.bulk_create(subdivision_instances)"""
 
 class PickleDBTest(CompareWithSQLTestCase):
-    fixtures = ["chinookdata.default.json", "chinookdata.pickle_db.json"]
+    fixtures = ["tracks.default.json", "tracks.pickle_db.json"]
+    multi_db = True
+
     def setUp(self):
         self.override_settings = {'DEBUG': True}
