@@ -4,6 +4,7 @@ import six
 from django.conf import settings
 
 class CompareWithSQLTestCase(TestCase):
+    multi_db = True
 
     def setUp(self):
         self.override_settings = {}

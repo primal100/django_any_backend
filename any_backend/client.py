@@ -35,6 +35,9 @@ class Client(object):
     def get_pks(self, model, filters):
         raise NotImplementedError("You have not implemented a get_pks function in your client class")
 
+    def flush(self, table, sequences, allow_cascade):
+        raise NotImplementedError("You have not implemented a flush function in your client class")
+
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:
             objects = filters.apply(objects)

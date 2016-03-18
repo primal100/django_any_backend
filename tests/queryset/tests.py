@@ -38,15 +38,16 @@ class PickleDBQuerysetTests(PickleDBTest):
             *order_by).reverse()[pagination[0]:pagination[1]]
         self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)"""
 
-    def test_count(self):
-        filters = {"composer": "U2"}
-        excludes = {"name": "Zoo Station"}
-        distinct = ["albumid"]
+    """def test_count(self):
         qs1 = SQLTrack.objects
         qs2 = Track.objects
-        self.assertCountEqual(qs1, qs2)
-        qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes).distinct(*distinct)
-        qs2 = Track.objects.filter(**filters).exclude(**excludes).distinct(*distinct)
+        self.assertCountEqual(qs1, qs2)"""
+
+    def test_count_complex(self):
+        filters = {"artist": 1}
+        excludes = {"album": "Achtung Baby"}
+        qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes)
+        qs2 = Track.objects.filter(**filters).exclude(**excludes)
         self.assertCountEqual(qs1, qs2, **self.override_settings)
 
     """def test_one_results(self):

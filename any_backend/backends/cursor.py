@@ -30,6 +30,8 @@ class Cursor(object):
 
     @property
     def rowcount(self):
+        if type(self.results) == int:
+            return self.results
         return len(self.results)
 
     @property

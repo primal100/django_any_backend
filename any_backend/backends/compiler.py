@@ -8,6 +8,7 @@ from django.core.cache import caches
 from any_backend.distinct import DistinctFields
 from any_backend.update import UpdateParams
 from cursor import CursorRequest
+import hashlib
 import logging
 
 logger = logging.getLogger('django')
@@ -25,6 +26,8 @@ class CompilerMixin(object):
             if hasattr(filter, 'lhs') and hasattr(filter, 'rhs'):
                 filter_obj = Filter(filter.lhs.field, filter.lookup_name, node.negated, filter.rhs)
                 filters.append(filter_obj)
+            elif hasattr(filter, 'children'):
+                filters += self.get_filters(filter)
         return filters
 
     def setup_attributes(self):
@@ -180,6 +183,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
 
     def cache_get(self, key):
         if self.cache:
+            key = hashlib.sha1(key).hexdigest()
             logger.debug('Checking cache for key %s ' % key)
             return self.cache.get(key, default=None)
         return None
@@ -190,6 +194,7 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 timeout = self.cache_count_all_timeout
             else:
                 timeout = self.cache_timeout
+            key = hashlib.sha1(key).hexdigest()
             logger.debug('Setting cache with key: %s, value: %s' % (key, value))
             self.cache.set(key, value, timeout)
 
@@ -243,7 +248,7 @@ class SQLDeleteCompiler(compiler.SQLDeleteCompiler, CompilerMixin):
         if not self.connection.migrations and self.model._meta.db_table == 'django_migrations':
             return []
         request = self.as_sql()
-        with self.connection.cursor as cursor:
+        with self.connection.cursor() as cursor:
             rows = cursor.execute(request)
             self.cache.clear()
             if result_type == CURSOR:
@@ -305,8 +310,6 @@ class SQLUpdateCompiler(compiler.SQLUpdateCompiler, CompilerMixin):
         with self.connection.cursor() as cursor:
             rows = cursor.execute(request)
         self.cache.clear()
-        if result_type == CURSOR:
-            return self.connection.cursor
         return rows
 
 class SQLAggregateCompiler(compiler.SQLAggregateCompiler, CompilerMixin):

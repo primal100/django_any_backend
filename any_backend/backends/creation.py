@@ -1,5 +1,6 @@
 from django.db.backends.base.creation import BaseDatabaseCreation
 import sys
+from cursor import CursorRequest
 
 class DatabaseCreation(BaseDatabaseCreation):
 
@@ -7,9 +8,6 @@ class DatabaseCreation(BaseDatabaseCreation):
         return self.connection.settings_dict['TEST']['NAME']
 
     def _create_test_db(self, verbosity, autoclobber, keepdb=False):
-        """
-        Internal implementation - creates the test db tables.
-        """
         test_database_name = self._get_test_db_name()
 
         self.connection.db_name = test_database_name
@@ -18,7 +16,7 @@ class DatabaseCreation(BaseDatabaseCreation):
             return test_database_name
 
         try:
-            self.connection.schema_editor().create_db(test_database_name),
+            self.connection.schema_editor().create_db(test_database_name)
         except Exception as e:
                 if keepdb:
                     return test_database_name

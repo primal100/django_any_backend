@@ -22,7 +22,6 @@ from any_backend.testcases import CompareWithSQLTestCase
 
 class PickleDBTest(CompareWithSQLTestCase):
     fixtures = ["tracks.default.json", "tracks.pickle_db.json"]
-    multi_db = True
 
     def setUp(self):
         self.override_settings = {'DEBUG': True}

@@ -10,7 +10,7 @@ class Filters(list):
     def __repr__(self):
         string = 'Filters='
         for item in sorted(self, key=operator.attrgetter('field_name')):
-            string += str(item)
+            string += str(item) + ';'
         return string
 
     def to_dict(self):
@@ -28,17 +28,17 @@ class Filters(list):
 class Filter(object):
     def __init__(self, field, operator, is_exclude, value):
         self.field = field
-        self.field_name = field.column
+        self.field_name = field.name
         self.field_type = field.get_internal_type()
         self.operator = operator
         self.is_exclude = is_exclude
         self.value = value
 
     def __repr__(self):
-        return 'Filter=' + self.field_name + ';' + self.operator + ';' + str(self.value) + ';'
+        value = str(self.value).replace(', ', ',')
+        return 'Filter=%s;%s;%s;%s' % (self.field_name, self.is_exclude, self.operator, value)
 
     def get(self, obj, sensitive):
-
         value = getvalue(obj, self.field_name, returnIfNone='')
         if not sensitive:
             return value.lower()

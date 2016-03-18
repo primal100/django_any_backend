@@ -94,3 +94,8 @@ class PickleDB(Client):
                 data[i] = update_with.apply(object)
         self.update_data(model=model, new_data=data)
         return len(objects)
+
+    def flush(self, table, sequences, allow_cascade):
+        data = self.get_data()
+        data[table] = []
+        self.update_data(data)

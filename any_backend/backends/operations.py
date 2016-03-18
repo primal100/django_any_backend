@@ -1,6 +1,5 @@
 from django.db.backends.base.operations import BaseDatabaseOperations
-from django.utils.encoding import force_text
-import six
+from cursor import CursorRequest
 
 class DatabaseOperations(BaseDatabaseOperations):
     def __init__(self, connection, cache=None):
@@ -28,3 +27,9 @@ class DatabaseOperations(BaseDatabaseOperations):
     def last_executed_query(self, cursor, sql, params):
         query = str(sql)
         return query
+
+    def sql_flush(self, style, tables, sequences, allow_cascade=False):
+        for table in tables:
+            key = 'DELETE %s' % (table)
+            request = CursorRequest(self.connection.client.flush, key, table, sequences, allow_cascade)
+            yield request
