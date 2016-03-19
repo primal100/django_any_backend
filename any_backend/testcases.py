@@ -1,10 +1,59 @@
-from django.test import TestCase
+from __future__ import unicode_literals
+from django.test.testcases import TestCase, connections_support_transactions, call_command
 from collections import Counter
+from django.apps import apps
+from django.db import connections
 import six
-from django.conf import settings
 
-class CompareWithSQLTestCase(TestCase):
+class AnyBackendTestCase(TestCase):
     multi_db = True
+
+    @classmethod
+    def setUpClass(cls):
+        super(TestCase, cls).setUpClass()
+        if not connections_support_transactions():
+            return
+        cls.cls_atomics = cls._enter_atomics()
+
+        if cls.fixtures:
+            for db_name in cls._databases_names(include_mirrors=False):
+                    try:
+                        call_command('loaddatabulk', *cls.fixtures, **{
+                            'verbosity': 0,
+                            'commit': False,
+                            'database': db_name,
+                        })
+                    except Exception:
+                        cls._rollback_atomics(cls.cls_atomics)
+                        raise
+        try:
+            cls.setUpTestData()
+        except Exception:
+            cls._rollback_atomics(cls.cls_atomics)
+            raise
+
+    def _fixture_setup(self):
+        for db_name in self._databases_names(include_mirrors=False):
+            # Reset sequences
+            if self.reset_sequences:
+                self._reset_sequences(db_name)
+
+            # If we need to provide replica initial data from migrated apps,
+            # then do so.
+            if self.serialized_rollback and hasattr(connections[db_name], "_test_serialized_contents"):
+                if self.available_apps is not None:
+                    apps.unset_available_apps()
+                connections[db_name].creation.deserialize_db_from_string(
+                    connections[db_name]._test_serialized_contents
+                )
+                if self.available_apps is not None:
+                    apps.set_available_apps(self.available_apps)
+
+            if self.fixtures:
+                # We have to use this slightly awkward syntax due to the fact
+                # that we're using *args and **kwargs together.
+                call_command('loaddatabulk', *self.fixtures,
+                             **{'verbosity': 0, 'database': db_name})
 
     def setUp(self):
         self.override_settings = {}
@@ -21,17 +70,22 @@ class CompareWithSQLTestCase(TestCase):
         qs2_values = list(qs2_items)
         self.assertEqual(qs1_values, qs2_values, msg=msg)
 
+    def assertObjectsEqual(self, obj1, obj2, fields, msg=None):
+        self.assertEqual(obj1.pk, obj2.pk, msg=msg)
+        for field in fields:
+            self.assertEqual(getattr(obj1, field), getattr(obj2, field), msg=msg)
+
     def assertValuesEqual(self, qs1, qs2, msg=None, **settings):
         with self.settings(**settings):
             results1 = qs1.values()
             results2 = qs2.values()
-        self.assertDictEqual(results1, results2, msg=msg)
+        self.assertQuerysetsEqual(results1, results2, msg=msg)
 
     def assertValueListEqual(self, qs1, qs2, msg=None, **settings):
         with self.settings(**settings):
-            results1 = qs1.value_list()
-            results2 = qs2.value_list()
-        self.assertListEqual(results1, results2, msg=msg)
+            results1 = qs1.values_list()
+            results2 = qs2.values_list()
+        self.assertQuerysetsEqual(results1, results2, msg=msg)
 
     def assertAggregateEqual(self, qs1, qs2, aggregate,msg=None, **settings):
         with self.settings(**settings):
@@ -53,37 +107,43 @@ class CompareWithSQLTestCase(TestCase):
 
     def assertExistsEqual(self, qs1, qs2, msg=None, **settings):
         with self.settings(**settings):
-            result1 = qs1.exist()
-            result2 = qs2.exist()
+            result1 = qs1.exists()
+            result2 = qs2.exists()
         self.assertEqual(result1, result2, msg=msg)
 
-    def assertFirstEqual(self, qs1, qs2, msg=None, **settings):
+    def assertFirstEqual(self, qs1, qs2, fields, msg=None, **settings):
         with self.settings(**settings):
             result1 = qs1.first()
             result2 = qs2.first()
         self.assertIsNotNone(result1)
         self.assertIsNotNone(result2)
-        self.assertEqual(result1, result2, msg=msg)
+        self.assertObjectsEqual(result1, result2, fields, msg=msg)
 
-    def assertLastEqual(self, qs1, qs2, msg=None, **settings):
+    def assertLastEqual(self, qs1, qs2, fields, msg=None, **settings):
         with self.settings(**settings):
             result1 = qs1.last()
-            result2 = qs2.larst()
+            result2 = qs2.last()
         self.assertIsNotNone(result1)
         self.assertIsNotNone(result2)
-        self.assertEqual(result1, result2, msg=msg)
+        self.assertObjectsEqual(result1, result2, fields, msg=msg)
 
-    def assertGetEqual(self, qs1, qs2, msg=None, **settings):
+    def assertGetEqual(self, qs1, qs2, fields, msg=None, **settings):
         with self.settings(**settings):
             result1 = qs1.get()
             result2 = qs2.get()
-        self.assertEqual(result1, result2, msg=msg)
+        self.assertObjectsEqual(result1, result2, fields, msg=msg)
 
     def assertNoneEqual(self, qs1, qs2, msg=None, **settings):
         with self.settings(**settings):
-            results1 = qs1.None()
-            results2 = qs2.None()
+            results1 = qs1.none()
+            results2 = qs2.none()
         self.assertListEqual(results1, results2, msg=msg)
+
+    def assertOneEqual(self, qs1, qs2, index, fields, msg=None, **settings):
+        with self.settings(**settings):
+            result1 = qs1[index]
+            result2 = qs2[index]
+        self.assertObjectsEqual(result1, result2, fields, msg=msg)
 
     def assertSaveEqual(self, model1, model2, params, msg=None, **settings):
         result1 = self.assertSave(model1, params, msg=msg, **settings)

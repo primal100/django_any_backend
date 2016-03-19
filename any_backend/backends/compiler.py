@@ -91,10 +91,13 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 if field_model == self.model:
                     field_tuple = (field.column,)
                 else:
-                    field_tuple = tuple(self.get_related(field, field_model))
+                    descriptor = getattr(self.model, field_model._meta.model_name)
+                    field_tuple = (descriptor.field.attname,)
+                    #field_tuple = tuple(self.get_related(field, field_model))
                 column_names += field.column + ';'
                 fieldnames.append(field_tuple)
             ordering = OrderingList()
+            ordering.set_reverse(self.query.standard_ordering)
             pk_attname = self.query.model._meta.pk.attname
             for i, order_by in enumerate(self.query.order_by):
                 if order_by == 'pk':
@@ -108,14 +111,19 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
 
             key = self.key(query, filters, column_names)
             request = CursorRequest(get_list, key, self.connection, key, self.model, filters, query, fieldnames,
-                                    self.page_size, self.chunk_size)
+                                    self.page_size, self.chunk_size, self.convert_to_tuples)
         return request, count
 
-    def execute_sql(self, result_type=MULTI):
+    def execute_sql(self, result_type=MULTI, convert_to_tuples=True):
         if not result_type:
             result_type = NO_RESULTS
 
         self.setup_attributes()
+
+        self.convert_to_tuples = convert_to_tuples
+
+        """if none_node:
+            return []"""
 
         if not self.connection.migrations and self.model._meta.db_table == 'django_migrations':
             return []
@@ -335,10 +343,10 @@ class SQLAggregateCompiler(compiler.SQLAggregateCompiler, CompilerMixin):
         return key
 
 
-def get_list(connection, key, model, filters, query, fieldnames, page_size, chunk_size):
+def get_list(connection, key, model, filters, query, fieldnames, page_size, chunk_size, convert_to_tuples):
     results = []
     remaining = page_size
-    pos = 0
+    pos = query['paginator'].low_mark
     pre_paginate_count = 0
     logger.debug('Retrieving result list. Page_size: %s. Chunk_size: %s' % (page_size, chunk_size))
     while remaining > 0:
@@ -350,10 +358,11 @@ def get_list(connection, key, model, filters, query, fieldnames, page_size, chun
         request = CursorRequest(connection.client.list, key, model, filters, **query)
         with connection.cursor() as cursor:
             chunk_results, pre_paginate_count = cursor.execute(request)
-            chunk_results = connection.client.convert_to_tuples(chunk_results, fieldnames)
+            if convert_to_tuples:
+                chunk_results = connection.client.convert_to_tuples(chunk_results, fieldnames)
             results.append(chunk_results)
             if page_size == float('inf'):
-                self.page_size = pre_paginate_count
+                page_size = pre_paginate_count
             if chunk_size == float('inf'):
                 remaining = 0
             else:

@@ -49,8 +49,12 @@ class PickleDB(Client):
                 last_pk = -1
             for i, object in enumerate(objects):
                 last_pk += 1
-                object[pk_fieldname] = last_pk
-                objects[i] = object
+                pk = object.get(pk_fieldname, None)
+                if not pk:
+                    object[pk_fieldname] = last_pk
+                    objects[i] = object
+                elif pk > last_pk:
+                    last_pk = pk + 1
         model_list += objects
         self.update_data(model=model, new_data=model_list)
         pks = [x[pk_fieldname] for x in objects]
@@ -70,12 +74,12 @@ class PickleDB(Client):
              out_cols=None):
         objects = self.get_data(model=model)
         objects, count = self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
-        for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
+        """for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
             for i, object in enumerate(objects):
                 fk_value = object[fk_columnname]
                 kwargs = {fk_pkfield: fk_value}
                 object[fk_fieldname] = fk_model.objects.filter(**kwargs).get()
-                objects[i] = object
+                objects[i] = object"""
         return objects, count
 
     def delete_bulk(self, model, filters):

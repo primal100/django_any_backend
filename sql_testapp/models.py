@@ -17,7 +17,7 @@ class Track(models.Model):
     release_date = models.DateField(blank=True, null=True)
 
     def __str__(self):
-        return '%s - %s' % (self.artist.name, self.name)
+        return self.name
 
 class Playlist(models.Model):
     name = models.CharField(max_length=20, blank=True, null=True)

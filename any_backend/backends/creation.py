@@ -1,6 +1,5 @@
 from django.db.backends.base.creation import BaseDatabaseCreation
 import sys
-from cursor import CursorRequest
 
 class DatabaseCreation(BaseDatabaseCreation):
 

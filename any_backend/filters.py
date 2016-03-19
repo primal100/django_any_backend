@@ -28,7 +28,7 @@ class Filters(list):
 class Filter(object):
     def __init__(self, field, operator, is_exclude, value):
         self.field = field
-        self.field_name = field.name
+        self.field_name = field.column
         self.field_type = field.get_internal_type()
         self.operator = operator
         self.is_exclude = is_exclude

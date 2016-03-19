@@ -23,8 +23,7 @@ class Track(models.Model):
     max_per_request = 100
 
     def __str__(self):
-        return '%s - %s' % (self.artist.name, self.name)
-
+        return self.name
 
 
 class Playlist(models.Model):

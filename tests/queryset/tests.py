@@ -4,91 +4,146 @@ from sql_testapp.models import Track as SQLTrack
 
 class PickleDBQuerysetTests(PickleDBTest):
 
-    """def test_qs(self):
-        filters = {"composer": "U2"}
-        excludes = {"name": "Zoo Station"}
-        order_by = ["milliseconds"]
-        distinct = ["albumid"]
-        single_obj = 0
-        pagination = (0, 8)
-        qs1 = SQLTrack.objects.all().order_by(*order_by)
-        qs2 = Track.objects.all().order_by(*order_by)
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.all().order_by(*order_by).reverse()
-        qs2 = Track.objects.all().order_by(*order_by).reverse()
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.filter(**filters).order_by(*order_by)
-        qs2 = Track.objects.filter(**filters).order_by(*order_by)
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.distinct(*distinct).order_by(*order_by)
-        qs2 = Track.objects.distinct(*distinct).order_by(*order_by)
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.exclude(**excludes).order_by(*order_by)
-        qs2 = Track.objects.exclude(**excludes).order_by(*order_by)
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.all().order_by(*order_by)[single_obj]
-        qs2 = Track.objects.all().order_by(*order_by)[single_obj]
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.all().order_by(*order_by)[pagination[0]:pagination[1]]
-        qs2 = Track.objects.all().order_by(*order_by)[pagination[0]:pagination[1]]
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
-        qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes).distinct(*distinct).order_by(
-            *order_by).reverse()[pagination[0]:pagination[1]]
-        qs2 = Track.objects.filter(**filters).exclude(**excludes).distinct(*distinct).order_by(
-            *order_by).reverse()[pagination[0]:pagination[1]]
-        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)"""
-
-    """def test_count(self):
+    def test_count(self):
         qs1 = SQLTrack.objects
         qs2 = Track.objects
-        self.assertCountEqual(qs1, qs2)"""
+        self.assertCountEqual(qs1, qs2)
 
-    def test_count_complex(self):
+    def test_complex_count(self):
         filters = {"artist": 1}
         excludes = {"album": "Achtung Baby"}
         qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes)
         qs2 = Track.objects.filter(**filters).exclude(**excludes)
         self.assertCountEqual(qs1, qs2, **self.override_settings)
 
-    """def test_one_results(self):
-        filters = {"name": "Man In The Box"}
-        qs1 = SQLTrack.objects.filter(filters)
-        qs2 = Track.objects.filter(filters)
-        self.assertGetEqual(qs1, qs2, **self.override_settings)
+    def test_all(self):
+        qs1 = SQLTrack.objects.all()
+        qs2 = Track.objects.all()
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
 
-    def test_multi_results(self):
-        filters = {"mediatypeid": 1}
-        excludes = {"name": "Zoo Station"}
-        order_by = ["milliseconds"]
-        distinct = ["albumid"]
-        pagination = (0, 10)
-        qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes).distinct(*distinct).order_by(
+    def test_order(self):
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_reverse_order(self):
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.all().order_by(*order_by).reverse()
+        qs2 = Track.objects.all().order_by(*order_by).reverse()
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_filter(self):
+        filters = {"artist": 1}
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.filter(**filters).order_by(*order_by)
+        qs2 = Track.objects.filter(**filters).order_by(*order_by)
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_exclude(self):
+        order_by = ["release_date", 'name']
+        excludes = {"album": "Achtung Baby"}
+        qs1 = SQLTrack.objects.exclude(**excludes).order_by(*order_by)
+        qs2 = Track.objects.exclude(**excludes).order_by(*order_by)
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_paginate_multi(self):
+        order_by = ["release_date", 'name']
+        pagination = (4, 8)
+        qs1 = SQLTrack.objects.all().order_by(*order_by)[pagination[0]:pagination[1]]
+        qs2 = Track.objects.all().order_by(*order_by)[pagination[0]:pagination[1]]
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_complex_qs(self):
+        filters = {"artist": 1}
+        excludes = {"album": "Achtung Baby"}
+        order_by = ["release_date", 'name']
+        pagination = (0, 8)
+        qs1 = SQLTrack.objects.filter(**filters).exclude(**excludes).order_by(
             *order_by).reverse()[pagination[0]:pagination[1]]
-        qs2 = Track.objects.filter(**filters).exclude(**excludes).distinct(*distinct).order_by(
+        qs2 = Track.objects.filter(**filters).exclude(**excludes).order_by(
             *order_by).reverse()[pagination[0]:pagination[1]]
-        self.assertFirstEqual(qs1, qs2, **self.override_settings)
-        self.assertLastEqual(qs1, qs2, **self.override_settings)
-        self.assertValuesEqual(qs1, qs2, **self.override_settings)
-        self.assertValueListEqual(qs1, qs2, **self.override_settings)
+        self.assertQuerysetsEqual(qs1, qs2, **self.override_settings)
+
+    def test_paginate_one(self):
+        order_by = ["release_date", 'name']
+        fields = ['name', 'artist_id', 'album', 'release_date']
+        index = 2
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertOneEqual(qs1, qs2, index, fields, **self.override_settings)
+
+    def test_get_result(self):
+        filters = {"name": "Blackened"}
+        fields = ['name', 'artist_id', 'album', 'release_date']
+        qs1 = SQLTrack.objects.filter(**filters)
+        qs2 = Track.objects.filter(**filters)
+        self.assertGetEqual(qs1, qs2, fields, **self.override_settings)
+
+    def test_first(self):
+        order_by = ["release_date", 'name']
+        fields = ['name', 'artist_id', 'album', 'release_date']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertFirstEqual(qs1, qs2, fields, **self.override_settings)
+
+    def test_last(self):
+        order_by = ["release_date", 'name']
+        fields = ['name', 'artist_id', 'album', 'release_date']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertLastEqual(qs1, qs2, fields, **self.override_settings)
+
+    def test_exists(self):
+        filters = {"name": "Blakened"}
+        qs1 = SQLTrack.objects.filter(**filters)
+        qs2 = Track.objects.filter(**filters)
         self.assertExistsEqual(qs1, qs2, **self.override_settings)
-        self.assertNoneEqual(qs1, qs2, **self.override_settings)
+        filters = {"name": "Blackened"}
+        qs1 = SQLTrack.objects.filter(**filters)
+        qs2 = Track.objects.filter(**filters)
+        self.assertExistsEqual(qs1, qs2, **self.override_settings)
 
-    def test_update(self):
+    def test_values(self):
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertValuesEqual(qs1, qs2)
+
+    def test_value_lists(self):
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertValueListEqual(qs1, qs2)
+
+    """def test_none(self):
+        order_by = ["release_date", 'name']
+        qs1 = SQLTrack.objects.order_by(*order_by)
+        qs2 = Track.objects.order_by(*order_by)
+        self.assertNoneEqual(qs1, qs2, **self.override_settings)"""
+
+    """def test_select_related(self):
+        pass"""
+
+    """def test_prefetch_related(self):
+        pass"""
+
+    """def test_update(self):
         filters = {"composer": "U2", "albumid": 232}
         params = {"unitprice": 1.10}
         qs1 = SQLTrack.objects.filter(**filters)
         qs2 = Track.objects.filter(**filters)
-        self.assertQsUpdateEqual(qs1, qs2, params, **self.override_settings)
+        self.assertQsUpdateEqual(qs1, qs2, params, **self.override_settings)"""
 
-    def test_create_delete(self):
+    """def test_create_delete(self):
         params = {"name": "Koyaanisqatsi", "albumid": 347, "mediatypeid": 2, "genreid": 10,
                         "composer": "Philip Glass", "milliseconds": 206005, "bytes": 3305164, "unitprice": "0.99"}
         qs1 = SQLTrack.objects.filter(**params)
         qs2 = Track.objects.filter(**params)
         self.assertQsDeleteEqual(qs1, qs2, **self.override_settings)
-        self.assertQsCreateEqual(SQLTrack, Track, params, **self.override_settings)
+        self.assertQsCreateEqual(SQLTrack, Track, params, **self.override_settings)"""
 
-    def test_bulk_create_delete(self):
+    """def test_bulk_create_delete(self):
 
         objs1 = SQLTrack(name = "Go Down", albumid = 4, mediatypeid = 1, genreid = 1, composer = "AC/DC",
             milliseconds = 331180, bytes = 10847611, unitprice = 0.99),
@@ -124,9 +179,9 @@ class PickleDBQuerysetTests(PickleDBTest):
         qs1 = SQLTrack.objects.filter(**filters)
         qs2 = Track.objects.filter(**filters)
         self.assertQsDeleteEqual(qs1, qs2, **self.override_settings)
-        self.assertBulkCreateEqual(SQLTrack, Track, objs1, objs2)
+        self.assertBulkCreateEqual(SQLTrack, Track, objs1, objs2)"""
 
-    def test_get_or_create(self):
+    """def test_get_or_create(self):
         params = {"name": "Highway To Hell", "albumid": 4, "mediatypeid": 1, "genreid": 1, "composer": "AC/DC",
                   "milliseconds": 331180, "bytes": 10847611, "unitprice": "0.99"}
         self.assertGetOrCreateEqual(SQLTrack, Track, params, **self.override_settings)

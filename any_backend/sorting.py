@@ -11,8 +11,11 @@ class OrderBy(object):
 
 class OrderingList(list):
 
+    def set_reverse(self, standard_ordering):
+        self.reverse_ordering = not standard_ordering
+
     def __repr__(self):
-        string = 'Ordering='
+        string = 'Ordering=%s' % (self.reverse_ordering)
         for column in self:
             string += column + ';'
         return string
@@ -31,19 +34,13 @@ class OrderingList(list):
 
     def to_list(self):
         ordering = []
-        reverse = False
-        reverse_set = False
+        reverse = self.reverse_ordering
         for column in self:
             if column.startswith('-'):
                 name = column.split('-')[1]
                 ordering.append(name)
-                if not reverse_set:
-                    reverse = True
             else:
                 ordering.append(column)
-                if not reverse_set:
-                    reverse = False
-            reverse_set = True
         return ordering, reverse
 
     def to_dicts(self):

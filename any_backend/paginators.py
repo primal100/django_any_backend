@@ -39,22 +39,22 @@ class BackendPaginator(object):
             self.paginate()
 
     def paginate(self):
-        self.page_size = self.high_mark - self.low_mark + 1
+        self.page_size = self.high_mark - self.low_mark
         self.page_num = ceil(self.low_mark / self.page_size) + 1
 
     def update(self, pos, size):
         if size:
             self.low_mark = self.low_mark =+ pos
-            self.high_mark = self.low_mark + size - 1
+            self.high_mark = self.low_mark + size
             self.paginated = True
             self.paginate()
 
     def apply(self, objects):
         if self.paginated:
             if len(objects) > self.high_mark:
-                return objects[self.low_mark:self.high_mark + 1]
+                return objects[self.low_mark:self.high_mark]
             elif len(objects) > self.low_mark:
-                return objects[self.low_mark:len(objects) + 1]
+                return objects[self.low_mark:len(objects)]
             else:
                 return []
         else:
