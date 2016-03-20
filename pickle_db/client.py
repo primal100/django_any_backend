@@ -1,5 +1,5 @@
 import pickle
-import os
+from any_backend.filters import Filters, Filter
 from operator import itemgetter
 from any_backend.client import Client
 from django.core.cache import caches
@@ -74,12 +74,17 @@ class PickleDB(Client):
              out_cols=None):
         objects = self.get_data(model=model)
         objects, count = self.apply_all(objects, filters=filters, distinct=distinct, order_by=order_by, paginator=paginator)
-        """for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related(model):
-            for i, object in enumerate(objects):
-                fk_value = object[fk_columnname]
-                kwargs = {fk_pkfield: fk_value}
-                object[fk_fieldname] = fk_model.objects.filter(**kwargs).get()
-                objects[i] = object"""
+        for fk_fieldname, fk_columnname, fk_model, fk_pkfield in self.get_related_one(model):
+            fk_values = []
+            for obj in objects:
+                fk_value = obj[fk_columnname]
+                fk_values.append(fk_value)
+            filters = Filters()
+            filters.append(Filter(fk_pkfield, 'in', False, fk_values))
+            related_objects = self.list(fk_model, filters)[0]
+            for i, obj in enumerate(objects):
+                obj[fk_fieldname] = [x for x in related_objects if x[fk_pkfield.attname] == obj[fk_columnname]][0]
+                objects[i] = obj
         return objects, count
 
     def delete_bulk(self, model, filters):

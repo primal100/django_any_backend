@@ -89,14 +89,18 @@ class Client(object):
             self.update(model, id, update_with=update_with)
         return ids
 
-    def get_related(self, model):
+    def get_related_one(self, model):
         forward_fields = model._meta._forward_fields_map
+        column_names = []
         for fieldname, field in forward_fields.iteritems():
-            if field.is_relation:
+            if field.is_relation and not field.many_to_many:
                 column_name = field.attname
-                fk_model = field.related_model
-                fk_pk = fk_model._meta.pk.attname
-                yield fieldname, column_name, fk_model, fk_pk
+                if column_name not in column_names:
+                    column_names.append(column_name)
+                    fk_model = field.related_model
+                    fk_pk = fk_model._meta.pk
+                    yield fieldname, column_name, fk_model, fk_pk
+
 
     def convert_to_tuple(self, object, fields):
         values = []

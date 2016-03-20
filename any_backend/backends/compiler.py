@@ -1,5 +1,6 @@
-from django.db.models.sql import compiler
+from django.db.models.sql import compiler, EmptyResultSet
 from django.db.models.sql.constants import MULTI, NO_RESULTS, SINGLE, CURSOR
+from django.db.models.fields.related_lookups import RelatedExact, RelatedGreaterThan, RelatedGreaterThanOrEqual,RelatedIsNull, RelatedLessThan, RelatedLessThanOrEqual, RelatedIn
 from django.core.exceptions import FieldError
 from any_backend.paginators import BackendPaginator
 from any_backend.filters import Filters, Filter
@@ -22,9 +23,14 @@ class CompilerMixin(object):
     def get_filters(self, node):
         filters = Filters()
         node_children = getattr(node, 'children', [])
+        negated = node.negated
+        related_classes = [RelatedExact, RelatedGreaterThan, RelatedGreaterThanOrEqual, RelatedIsNull, RelatedLessThan,
+                           RelatedLessThanOrEqual, RelatedIn]
         for filter in node_children:
+            if not any(isinstance(filter, x) for x in related_classes):
+                filter.as_sql(self, self.connection)
             if hasattr(filter, 'lhs') and hasattr(filter, 'rhs'):
-                filter_obj = Filter(filter.lhs.field, filter.lookup_name, node.negated, filter.rhs)
+                filter_obj = Filter(filter.lhs.field, filter.lookup_name, negated, filter.rhs)
                 filters.append(filter_obj)
             elif hasattr(filter, 'children'):
                 filters += self.get_filters(filter)
@@ -62,6 +68,25 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
         return field_tuple
 
     def as_sql(self, with_limits=True, with_col_aliases=False, subquery=False):
+        if not self.connection.migrations and self.model._meta.db_table == 'django_migrations':
+            raise EmptyResultSet
+
+        self.setup_attributes()
+
+        result_type = getattr(self, 'result_type', MULTI)
+        convert_to_tuples = getattr(self, 'convert_to_tuples', True)
+
+        paginator = BackendPaginator(True, self.query.low_mark, self.query.high_mark,
+                                                   self.connection.ops.no_limit_value())
+        if result_type == SINGLE:
+            self.query.high_mark = self.query.low_mark + 1
+            page_size = 1
+        else:
+            if paginator.paginated:
+                page_size = paginator.page_size
+            else:
+                page_size = float('inf')
+
         query, params = {}, {}
 
         filters = self.get_filters(self.query.where) if self.query.where is not None else ([])
@@ -72,12 +97,19 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
 
         count = False
         self.fields = []
-        for column in self.select:
-            field = column[0]._output_field
-            if hasattr(field, 'column'):
-               self.fields.append(field)
-            elif 'count' in str(column):
+        if self.select:
+            for column in self.select:
+                field = column[0]._output_field
+                if hasattr(field, 'column'):
+                   self.fields.append(field)
+                elif 'count' in str(column):
+                    count = True
+                    break
+
+        for column in self.query.select:
+            if 'count' in str(column):
                 count = True
+                break
 
         if count:
             key = self.key(query, filters, '', count=True)
@@ -90,10 +122,11 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
                 field_model = field.model
                 if field_model == self.model:
                     field_tuple = (field.column,)
-                else:
+                elif field.primary_key:
                     descriptor = getattr(self.model, field_model._meta.model_name)
                     field_tuple = (descriptor.field.attname,)
-                    #field_tuple = tuple(self.get_related(field, field_model))
+                else:
+                    field_tuple = tuple(self.get_related(field, field_model))
                 column_names += field.column + ';'
                 fieldnames.append(field_tuple)
             ordering = OrderingList()
@@ -107,39 +140,28 @@ class SQLCompiler(compiler.SQLCompiler, CompilerMixin):
             ordering += self.query.order_by
             query['order_by'] = ordering
 
-            query['paginator'] = self.paginator
+            query['paginator'] = paginator
 
             key = self.key(query, filters, column_names)
             request = CursorRequest(get_list, key, self.connection, key, self.model, filters, query, fieldnames,
-                                    self.page_size, self.chunk_size, self.convert_to_tuples)
+                                    page_size, self.chunk_size, convert_to_tuples)
         return request, count
 
     def execute_sql(self, result_type=MULTI, convert_to_tuples=True):
         if not result_type:
             result_type = NO_RESULTS
 
-        self.setup_attributes()
+        self.result_type = result_type
 
         self.convert_to_tuples = convert_to_tuples
 
-        """if none_node:
-            return []"""
-
-        if not self.connection.migrations and self.model._meta.db_table == 'django_migrations':
-            return []
-
-        self.paginator = BackendPaginator(True, self.query.low_mark, self.query.high_mark,
-                                                   self.connection.ops.no_limit_value())
-        if result_type == SINGLE:
-            self.query.high_mark = self.query.low_mark + 1
-            self.page_size = 1
-        else:
-            if self.paginator.paginated:
-                self.page_size = self.paginator.page_size
+        try:
+            request, count = self.as_sql()
+        except EmptyResultSet:
+            if result_type == MULTI:
+                return iter([])
             else:
-                self.page_size = float('inf')
-
-        request, count = self.as_sql()
+                return
 
         if count:
             results = self.cache_get(request.key)

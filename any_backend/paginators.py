@@ -1,30 +1,4 @@
-from django.core.paginator import Paginator
-from django.contrib.admin.views.main import PAGE_VAR
 from math import ceil
-
-class APIPaginator(Paginator):
-
-    def __init__(self, object_list, per_page, orphans=0,
-                 allow_empty_first_page=True, request=None, page_num=None):
-        super(APIPaginator, self).__init__(object_list, per_page, orphans=orphans,
-                                           allow_empty_first_page=allow_empty_first_page)
-        page_num = page_num
-        if not page_num and request:
-            page_num = int(request.GET.get(PAGE_VAR, 0))
-        bottom = (page_num) * self.per_page
-        top = bottom + self.per_page
-        self.page_object_list = list(self.object_list[bottom:top])
-
-    def page(self, number):
-        """
-        Returns a Page object for the given 1-based page number.
-        """
-        number = self.validate_number(number)
-        bottom = (number - 1) * self.per_page
-        top = bottom + self.per_page
-        if top + self.orphans >= self.count:
-            top = self.count
-        return self._get_page(self.page_object_list, number, self)
 
 class BackendPaginator(object):
     def __init__(self, with_limits, low_mark, high_mark, no_limit_value):
