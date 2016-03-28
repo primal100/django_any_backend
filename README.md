@@ -135,3 +135,44 @@ class CustomClient(Client):
         return ids
 ```
 
+Then add the custom client to the list of database backends in settings.py
+
+```python
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    },
+    'custom': {
+        'ENGINE': 'any_backend.backends',
+        'NAME': os.path.join(BASE_DIR, 'custom'),
+        'CLIENT': 'mycustombackend.client.CustomClient',
+        'MIGRATIONS': False,
+    }
+}
+```
+
+You need to add a database router in settings.py. Django_Any_Backend comes with one. To use it add the following line to settings.py.
+
+```python
+DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
+```
+
+If using this router, it is required to mark which models to route to the custom backend. This is done by adding non_db and max_per_request attributes to each model which will use a custom non-db backend. Use the name of the backend as specified above in the DATABASES attribute of settings.py.
+
+In models.py:
+
+```python
+class Artist(models.Model):
+    name = models.CharField(max_length=20, blank=True, null=True)
+    type = models.IntegerField(choices=((0, 'Solo'), (1, 'Group')))
+    genre = models.CharField(max_length=15)
+
+    non_db = 'custom'
+    max_per_request = 100
+
+```
+
+If max_per_request is set, big list requests will be broken up into chunks.
+
+To enable migrations it is required to implement Introspection and Schema modules. Obviously not required if the backend is a remote api. Information about other features will be added soon, for now check out the example called testapp.
