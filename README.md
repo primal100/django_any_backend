@@ -152,7 +152,7 @@ DATABASES = {
 }
 ```
 
-You need to add a database router in settings.py. Django_Any_Backend comes with one. To use it add the following line to settings.py.
+You need to add a database router in settings.py (https://docs.djangoproject.com/en/1.9/topics/db/multi-db/#using-routers). Django_Any_Backend comes with one built-in which you can use by adding the following line to settings.py.
 
 ```python
 DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
@@ -175,4 +175,6 @@ class Artist(models.Model):
 
 If max_per_request is set, big list requests will be broken up into chunks.
 
-To enable migrations it is required to implement Introspection and Schema modules. Obviously not required if the backend is a remote api. Information about other features will be added soon, for now check out the example called testapp.
+To enable migrations it is required to implement Introspection and Schema modules. Obviously not required if the backend is a remote api. Information about other features will be added soon, for now check out the example called testapp. 
+
+
