@@ -2,12 +2,12 @@ from django.db.models.sql import compiler, EmptyResultSet
 from django.db.models.sql.constants import MULTI, NO_RESULTS, SINGLE, CURSOR
 from django.db.models.fields.related_lookups import RelatedExact, RelatedGreaterThan, RelatedGreaterThanOrEqual,RelatedIsNull, RelatedLessThan, RelatedLessThanOrEqual, RelatedIn
 from django.core.exceptions import FieldError
-from any_backend.paginators import BackendPaginator
-from any_backend.filters import Filters, Filter
-from any_backend.sorting import OrderingList
+from django_any_backend.paginators import BackendPaginator
+from django_any_backend.filters import Filters, Filter
+from django_any_backend.sorting import OrderingList
 from django.core.cache import caches
-from any_backend.distinct import DistinctFields
-from any_backend.update import UpdateParams
+from django_any_backend.distinct import DistinctFields
+from django_any_backend.update import UpdateParams
 from cursor import CursorRequest
 import hashlib
 import logging

@@ -13,14 +13,14 @@ A sample app using Pickle as a backend is included for demonstration and test pu
 
 # Getting Started #
 
-Import the any_backend Client object and override the key functions. There are two possible appraches for the write operations:
+Import the django_any_backend Client object and override the key functions. There are two possible appraches for the write operations:
 
 1.  Override create, update, delete (for individual objects) and get_pks. The default bulk functions will then loop through each object and run the required functions.
 2.  Override create_bulk, delete_bulk and update_bulk. In this case the functions in option 1 are not required.
 
 ```python
 
-from any_backend.client import Client
+from django_any_backend.client import Client
 
 class CustomClient(Client):
 
@@ -137,7 +137,9 @@ class CustomClient(Client):
         return ids
 ```
 
-Then add the custom client to the list of database backends in settings.py
+In settings.py, add 'django_any_backend' to the list of installed apps,
+
+Then add the custom client to the list of database backends:
 
 ```python
 DATABASES = {
@@ -146,7 +148,7 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     },
     'custom': {
-        'ENGINE': 'any_backend.backends',
+        'ENGINE': 'django_any_backend.backends',
         'NAME': os.path.join(BASE_DIR, 'custom'),
         'CLIENT': 'mycustombackend.client.CustomClient',
         'MIGRATIONS': False,
@@ -157,7 +159,7 @@ DATABASES = {
 You need to add a database router in settings.py (https://docs.djangoproject.com/en/1.9/topics/db/multi-db/#using-routers). Django_Any_Backend comes with one built-in which you can use by adding the following line to settings.py.
 
 ```python
-DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
+DATABASE_ROUTERS = ['django_any_backend.routers.BackendRouter']
 ```
 
 If using this router, it is required to mark which models to route to the custom backend. This is done by adding non_db and max_per_request attributes to each model which will use a custom non-db backend. Use the name of the backend as specified above in the DATABASES attribute of settings.py.

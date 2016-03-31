@@ -17,7 +17,7 @@ class DatabaseWrapper(BaseDatabaseWrapper):
     Database = Database
     SchemaEditorClass = DatabaseSchemaEditor
     is_non_db = True
-    default_compiler = 'any_backend.backends.compiler'
+    default_compiler = 'django_any_backend.backends.compiler'
 
     operators = {
         'exact': '= %s',

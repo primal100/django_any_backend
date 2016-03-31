@@ -1,4 +1,4 @@
-from any_backend.backends.schema import DatabaseSchemaEditor as BaseDatabaseSchemaEditor
+from django_any_backend.backends.schema import DatabaseSchemaEditor as BaseDatabaseSchemaEditor
 import os
 
 class DatabaseSchemaEditor(BaseDatabaseSchemaEditor):

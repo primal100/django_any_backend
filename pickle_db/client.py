@@ -1,7 +1,7 @@
 import pickle
-from any_backend.filters import Filters, Filter
+from django_any_backend.filters import Filters, Filter
 from operator import itemgetter
-from any_backend.client import Client
+from django_any_backend.client import Client
 from django.core.cache import caches
 
 class PickleDB(Client):

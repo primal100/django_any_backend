@@ -37,7 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'any_backend',
+    'django_any_backend',
     'sql_testapp',
     'testapp'
 ]
@@ -83,7 +83,7 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     },
     'pickle_db': {
-        'ENGINE': 'any_backend.backends',
+        'ENGINE': 'django_any_backend.backends',
         'NAME': os.path.join(BASE_DIR, 'db.pickle'),
         'CLIENT': 'pickle_db.client.PickleDB',
         'SCHEMA': 'pickle_db.schema',
@@ -100,7 +100,7 @@ DATABASES = {
     }
 }
 
-DATABASE_ROUTERS = ['any_backend.routers.BackendRouter']
+DATABASE_ROUTERS = ['django_any_backend.routers.BackendRouter']
 
 CACHES = {
     'default':{
