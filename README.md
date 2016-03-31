@@ -13,6 +13,12 @@ A sample app using Pickle as a backend is included for demonstration and test pu
 
 # Getting Started #
 
+Install the app with
+
+```shell
+pip install django-any-backend.
+```
+
 Import the django_any_backend Client object and override the key functions. There are two possible appraches for the write operations:
 
 1.  Override create, update, delete (for individual objects) and get_pks. The default bulk functions will then loop through each object and run the required functions.
@@ -182,3 +188,9 @@ If max_per_request is set, big list requests will be broken up into chunks.
 To enable migrations it is required to implement Introspection and Schema modules. Obviously not required if the backend is a remote api. Information about other features will be added soon, for now check out the example called testapp. 
 
 
+# Contributions #
+
+Django_any_backend still needs work. It has only been tested so far in Python 2.7 and Django 1.9.
+More tests need to be written.
+Although Django_any_backend has no restrictions on many_to_many, the pickle_db example doesn't support it so it can't be tested yet.
+Support for distinct fields needs to be tested
