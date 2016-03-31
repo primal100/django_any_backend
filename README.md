@@ -9,6 +9,8 @@ DJANGO_ANY_BACKEND is designed to allow the use of models with non-database back
 
 The second objective is to make it as simple as possible to implement a new custom backend by subclassing one class and providing the required crud functions. This was influenced by how custom backends can be implented in Flask.
 
+A sample app using Pickle as a backend is included for demonstration and test purposes.
+
 # Getting Started #
 
 Import the any_backend Client object and override the key functions. There are two possible appraches for the write operations:
