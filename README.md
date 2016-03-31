@@ -16,7 +16,7 @@ A sample app using Pickle as a backend is included for demonstration and test pu
 Install the app with
 
 ```shell
-pip install django-any-backend.
+pip install django-any-backend
 ```
 
 Import the django_any_backend Client object and override the key functions. There are two possible appraches for the write operations:
