@@ -191,6 +191,9 @@ To enable migrations it is required to implement Introspection and Schema module
 # Contributions #
 
 Django_any_backend still needs work. It has only been tested so far in Python 2.7 and Django 1.9.
+
 More tests need to be written.
-Although Django_any_backend has no restrictions on many_to_many, the pickle_db example doesn't support it so it can't be tested yet.
-Support for distinct fields needs to be tested
+
+Although Django_any_backend has no restrictions on many_to_many, the pickle_db example doesn't support it so it can't be tested yet
+
+Support for distinct fields needs to be tested.
