@@ -7,7 +7,7 @@ class Artist(models.Model):
     type = models.IntegerField(choices=((0, 'Solo'), (1, 'Group')))
     genre = models.CharField(max_length=15)
 
-    non_db = 'pickle_db'
+    any_backend = 'pickle_db'
     max_per_request = 100
 
     def __str__(self):
@@ -19,7 +19,7 @@ class Track(models.Model):
     name = models.CharField( max_length=200)
     release_date = models.DateField(blank=True, null=True)
 
-    non_db = 'pickle_db'
+    any_backend = 'pickle_db'
     max_per_request = 100
 
     def __str__(self):
@@ -32,7 +32,7 @@ class Playlist(models.Model):
     added = models.DateTimeField(auto_now_add=True)
     tracks = models.ManyToManyField(Track, related_name='playlists')
 
-    non_db = 'pickle_db'
+    any_backend = 'pickle_db'
     max_per_request = 100
 
     def __str__(self):

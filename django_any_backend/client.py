@@ -1,9 +1,12 @@
 from utils import getvalue
 
 class Client(object):
+    default_compiler = 'django_any_backend.backends.compiler'
+
     def __init__(self, db_config):
         self.db_config = db_config
         self.name = self.db_config['NAME']
+        self.compiler_module = self.db_config.get('COMPILER', None) or self.default_compiler
 
     def setup(self, db_name):
         """
@@ -93,7 +96,7 @@ class Client(object):
         """
         Bulk delete a list of model instances. The default implementation runs the get_pks function, looping through the objects and runs a custom delete.
         :param kwargs:
-        :return: ids The number of objects successfully deleted
+        :return: count The number of objects successfully deleted
         """
         ids = self.get_pks(model, filters)
 
@@ -109,13 +112,13 @@ class Client(object):
         Bulk delete a list of model instances. The default implementation runs the get_pks function, looping through the objects and runs a custom update function.
         :param params:
         :param kwargs:
-        :return: ids The number of objects successfully updated
+        :return: count The number of objects successfully updated
         """
         ids = self.get_pks(model, filters)
 
         for id in ids:
             self.update(model, id, update_with=update_with)
-        return ids
+        return len(ids)
 
     def apply_all(self, objects, filters=None, distinct=None, order_by=None, paginator=None, count_only=False):
         if filters:

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='django_any_backend',
-    version='0.1',
+    version='0.21',
     description="Enable custom backends in Django",
     long_description="Easily implement custom backends such as remote APIs in Django",
     author='Paul Martin',
